@@ -320,6 +320,18 @@
     try {
       const res  = await fetch('/api/orders?' + lastParams);
       const data = await res.json();
+
+      // Not authenticated — redirect to Shopify OAuth
+      if (res.status === 401) {
+        tblWrap.innerHTML = `<div class="state">
+          <div class="ico">🔐</div>
+          <p style="margin-bottom:14px">App not connected to Shopify yet.</p>
+          <a href="/auth" class="btn btn-primary" style="text-decoration:none">Connect to Shopify</a>
+        </div>`;
+        tableLabel.textContent = 'Authentication required';
+        return;
+      }
+
       if (!res.ok) throw new Error(data.error || 'Server error');
 
       const { rows, stats } = data;
