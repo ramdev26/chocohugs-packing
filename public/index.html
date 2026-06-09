@@ -218,6 +218,79 @@
     }
     .qty-warn-icon { font-size: 12px; flex-shrink: 0; }
 
+    /* ── Analytics ── */
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .chart-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--sub);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .bar-row:last-child { margin-bottom: 0; }
+    .bar-label {
+      font-size: 12px;
+      color: var(--text);
+      width: 110px;
+      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .bar-track {
+      flex: 1;
+      height: 8px;
+      background: var(--bg);
+      border-radius: 4px;
+      overflow: hidden;
+      min-width: 40px;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      min-width: 4px;
+      transition: width .5s cubic-bezier(.4,0,.2,1);
+    }
+    .bar-count {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      min-width: 24px;
+      text-align: right;
+    }
+    .split-bar {
+      height: 18px;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      margin-bottom: 8px;
+    }
+    .legend { display: flex; gap: 14px; font-size: 12px; flex-wrap: wrap; }
+    .legend-dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 3px;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+    .an-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+    @media (max-width: 900px) { .analytics-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 680px) { .analytics-grid { grid-template-columns: 1fr; } }
+
     /* ── State messages ── */
     .state { padding: 48px 20px; text-align: center; color: var(--sub); }
     .state .ico { font-size: 36px; margin-bottom: 10px; }
@@ -412,6 +485,15 @@
     </div>
   </div>
 
+  <!-- Analytics -->
+  <div id="analyticsSection" style="display:none;" class="no-print">
+    <div class="analytics-grid">
+      <div class="card card-body" id="chartProducts"></div>
+      <div class="card card-body" id="chartCards"></div>
+      <div class="card card-body" id="chartAddons"></div>
+    </div>
+  </div>
+
   <!-- Table / Cards -->
   <div class="card">
     <div class="table-bar">
@@ -456,6 +538,7 @@
     loadBtn.innerHTML = '<span class="spin"></span> Loading…';
     tblWrap.innerHTML = '<div class="state"><span class="spin"></span><p style="margin-top:14px">Fetching orders…</p></div>';
     document.getElementById('statsCard').style.display = 'none';
+    document.getElementById('analyticsSection').style.display = 'none';
     setActionBtns(false);
 
     lastParams = params();
@@ -495,6 +578,7 @@
 
       // Render both table (desktop) and cards (mobile) — CSS shows the right one
       tblWrap.innerHTML = buildTable(rows) + buildCards(rows);
+      buildAnalytics(rows);
 
       const from = document.getElementById('dateFrom').value;
       const to   = document.getElementById('dateTo').value;
@@ -667,6 +751,94 @@
         return `<td>${esc(String(v))}</td>`;
     }
   }
+
+  /* ── Analytics ── */
+  function buildAnalytics(rows) {
+    if (!rows.length) return;
+
+    // ── 1. Top Products by total qty ──
+    const prodMap = {};
+    rows.forEach(r => {
+      prodMap[r['Product']] = (prodMap[r['Product']] || 0) + Number(r['Qty']);
+    });
+    const products = Object.entries(prodMap).sort((a, b) => b[1] - a[1]).slice(0, 7);
+    const maxProd  = products[0]?.[1] || 1;
+
+    document.getElementById('chartProducts').innerHTML =
+      `<div class="chart-title">📦 Top Products</div>` +
+      products.map(([name, qty]) =>
+        `<div class="bar-row">
+          <div class="bar-label" title="${esc(name)}">${esc(name)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct(qty,maxProd)}%;background:var(--green)"></div></div>
+          <div class="bar-count">${qty}</div>
+        </div>`
+      ).join('') || '<p class="text-sub" style="font-size:12px">No data</p>';
+
+    // ── 2. Greeting Cards breakdown ──
+    const cardMap = {};
+    let noCardCount = 0;
+    rows.forEach(r => {
+      if (r['Greeting Card'] === 'None') { noCardCount++; }
+      else { cardMap[r['Greeting Card']] = (cardMap[r['Greeting Card']] || 0) + 1; }
+    });
+    const cards   = Object.entries(cardMap).sort((a, b) => b[1] - a[1]);
+    const maxCard = Math.max(...cards.map(([,v]) => v), noCardCount, 1);
+
+    document.getElementById('chartCards').innerHTML =
+      `<div class="chart-title">🎂 Greeting Cards</div>` +
+      cards.map(([name, count]) =>
+        `<div class="bar-row">
+          <div class="bar-label" title="${esc(name)}">${esc(name)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct(count,maxCard)}%;background:#0051c3"></div></div>
+          <div class="bar-count">${count}</div>
+        </div>`
+      ).join('') +
+      (noCardCount
+        ? `<div class="bar-row">
+            <div class="bar-label" style="color:var(--sub)">No card</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${pct(noCardCount,maxCard)}%;background:var(--border)"></div></div>
+            <div class="bar-count" style="color:var(--sub)">${noCardCount}</div>
+          </div>` : '') ||
+      '<p class="text-sub" style="font-size:12px">No data</p>';
+
+    // ── 3. Ribbon & Bow + Fulfilment Status ──
+    const ribbonYes = rows.filter(r => r['Ribbon & Bow'] === 'Yes').length;
+    const ribbonNo  = rows.length - ribbonYes;
+    const yesW      = rows.length ? pct(ribbonYes, rows.length) : 0;
+
+    const statusMap = {};
+    rows.forEach(r => {
+      const s = r['Status'] || 'unfulfilled';
+      statusMap[s] = (statusMap[s] || 0) + 1;
+    });
+    const statuses   = Object.entries(statusMap).sort((a, b) => b[1] - a[1]);
+    const maxStatus  = statuses[0]?.[1] || 1;
+    const statusColor = { fulfilled: '#008060', unfulfilled: '#f0a500', partial: '#0051c3' };
+
+    document.getElementById('chartAddons').innerHTML =
+      `<div class="chart-title">🎀 Ribbon &amp; Bow</div>
+      <div class="split-bar">
+        <div style="width:${yesW}%;background:var(--badge-yes)"></div>
+        <div style="width:${100-yesW}%;background:var(--bg)"></div>
+      </div>
+      <div class="legend" style="margin-bottom:4px">
+        <span><span class="legend-dot" style="background:var(--badge-yes)"></span>Yes: <strong>${ribbonYes}</strong> (${yesW}%)</span>
+        <span><span class="legend-dot" style="background:var(--bg);border:1px solid var(--border)"></span>No: <strong>${ribbonNo}</strong></span>
+      </div>
+      <hr class="an-divider">
+      <div class="chart-title">📋 Fulfilment Status</div>` +
+      statuses.map(([s, count]) =>
+        `<div class="bar-row">
+          <div class="bar-label">${esc(s.charAt(0).toUpperCase() + s.slice(1))}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct(count,maxStatus)}%;background:${statusColor[s]||'var(--sub)'}"></div></div>
+          <div class="bar-count">${count}</div>
+        </div>`
+      ).join('');
+
+    document.getElementById('analyticsSection').style.display = '';
+  }
+
+  function pct(val, max) { return max ? Math.max(4, Math.round((val / max) * 100)) : 4; }
 
   /* Returns a warning tag when qty > 1 AND there's a card or ribbon selected.
      Reminds the packing team: same add-ons apply to ALL units in this line item. */
