@@ -20,9 +20,18 @@ if (!SHOPIFY_STORE || !SHOPIFY_API_KEY || !SHOPIFY_API_SECRET) {
   process.exit(1);
 }
 
-// Token held in memory; survives requests but resets on restart.
-// On Railway, set SHOPIFY_ACCESS_TOKEN env var to skip re-auth after restarts.
 let ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN || null;
+
+// Allow Shopify admin to embed this app in an iframe.
+// Must come before all other middleware so every response gets the header.
+app.use((_req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "frame-ancestors https://admin.shopify.com https://*.myshopify.com https://*.shopify.com"
+  );
+  res.removeHeader('X-Frame-Options');
+  next();
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

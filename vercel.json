@@ -11,5 +11,20 @@
       "src": "/(.*)",
       "dest": "/server.js"
     }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors https://admin.shopify.com https://*.myshopify.com https://*.shopify.com"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "ALLOWALL"
+        }
+      ]
+    }
   ]
 }
