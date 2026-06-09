@@ -389,15 +389,16 @@
 
   function buildTable(rows) {
     const cols = [
-      { key: 'Order Number',       th: 'Order #'         },
-      { key: 'Order Date',         th: 'Date'            },
-      { key: 'Customer',           th: 'Customer'        },
-      { key: 'Product Name',       th: 'Product'         },
-      { key: 'Quantity',           th: 'Qty'             },
-      { key: 'Greeting Card',      th: 'Greeting Card'   },
-      { key: 'Ribbon & Bow',       th: 'Ribbon &amp; Bow'},
-      { key: 'Personal Message',   th: 'Message / Note'  },
-      { key: 'Fulfillment Status', th: 'Status'          },
+      { key: 'Order #',       th: 'Order #'         },
+      { key: 'Date',          th: 'Date'            },
+      { key: 'Customer',      th: 'Customer'        },
+      { key: 'Item',          th: 'Item'            },
+      { key: 'Product',       th: 'Product'         },
+      { key: 'Qty',           th: 'Qty'             },
+      { key: 'Greeting Card', th: 'Greeting Card'   },
+      { key: 'Ribbon & Bow',  th: 'Ribbon &amp; Bow'},
+      { key: 'Message',       th: 'Message / Note'  },
+      { key: 'Status',        th: 'Status'          },
     ];
 
     const head = `<thead><tr>${cols.map(c => `<th>${c.th}</th>`).join('')}</tr></thead>`;
@@ -407,16 +408,19 @@
         const v = row[key] ?? '';
         switch (key) {
 
-          case 'Order Number':
+          case 'Order #':
             return `<td><span class="order-num">${esc(v)}</span></td>`;
 
-          case 'Product Name': {
+          case 'Item':
+            return `<td><span class="text-sub" style="white-space:nowrap">${esc(String(v))}</span></td>`;
+
+          case 'Product': {
             const variant = row['Variant'] ? `<div class="text-sub">${esc(row['Variant'])}</div>` : '';
             const sku     = row['SKU']     ? `<div class="text-sub">SKU: ${esc(row['SKU'])}</div>` : '';
             return `<td><div class="product-name">${esc(v)}</div>${variant}${sku}</td>`;
           }
 
-          case 'Quantity':
+          case 'Qty':
             return `<td class="qty">${esc(String(v))}</td>`;
 
           case 'Greeting Card':
@@ -429,12 +433,12 @@
               ? `<td><span class="badge b-yes">✓ Yes</span></td>`
               : `<td><span class="badge b-no">No</span></td>`;
 
-          case 'Personal Message':
+          case 'Message':
             return v
               ? `<td><span class="msg">"${esc(v)}"</span></td>`
               : `<td><span style="color:var(--border)">—</span></td>`;
 
-          case 'Fulfillment Status': {
+          case 'Status': {
             const cls = { fulfilled: 'b-fulfilled', unfulfilled: 'b-unfulfilled', partial: 'b-partial' }[v] || 'b-no';
             return `<td><span class="badge ${cls}">${esc(v.charAt(0).toUpperCase() + v.slice(1))}</span></td>`;
           }

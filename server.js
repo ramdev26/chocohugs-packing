@@ -48,14 +48,15 @@ function cleanCard(val) {
 }
 
 function packingSummary(row) {
-  const parts = [row['Order Number'], `Qty: ${row['Quantity']}`, row['Product Name']];
-  if (row['Variant']) parts[2] += ` (${row['Variant']})`;
-  if (row['Greeting Card'] !== 'None') parts.push(`Card: ${row['Greeting Card']}`);
+  const product = row['Product'] + (row['Variant'] ? ` (${row['Variant']})` : '');
+  const parts = [row['Order #'], `Qty ${row['Qty']}`, product];
+  if (row['Greeting Card'] !== 'None') parts.push(row['Greeting Card'] + ' Card');
   parts.push(`Ribbon: ${row['Ribbon & Bow']}`);
-  if (row['Personal Message']) parts.push(`Msg: ${row['Personal Message']}`);
+  if (row['Message']) parts.push(`Note: ${row['Message']}`);
   return parts.join(' | ');
 }
 
+// Returns flat array of data rows (no separators) — used for the web preview.
 function ordersToRows(orders) {
   const rows = [];
   const knownKeys = new Set(['greeting card', 'ribbon & bow', 'ribbon', 'personal message', 'message', 'note']);
@@ -68,9 +69,12 @@ function ordersToRows(orders) {
     const customer = order.shipping_address
       ? `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim()
       : (order.email || '');
+    const total = order.line_items.length;
 
-    for (const item of order.line_items) {
+    for (let i = 0; i < order.line_items.length; i++) {
+      const item  = order.line_items[i];
       const props = item.properties || [];
+
       const greetingCard = cleanCard(getProp(props, 'Greeting Card', 'greeting card'));
       const ribbon       = cleanRibbon(getProp(props, 'Ribbon & Bow', 'ribbon & bow', 'ribbon'));
       const message      = getProp(props, 'Personal Message', 'personal message', 'message', 'note') || orderNote;
@@ -82,24 +86,81 @@ function ordersToRows(orders) {
         .join(' | ');
 
       const row = {
-        'Order Number':       `#${order.order_number}`,
-        'Order Date':         orderDate,
-        'Customer':           customer,
-        'Product Name':       item.title,
-        'Variant':            item.variant_title || '',
-        'SKU':                item.sku || '',
-        'Quantity':           item.quantity,
-        'Greeting Card':      greetingCard,
-        'Ribbon & Bow':       ribbon,
-        'Personal Message':   message,
-        'Other Add-ons':      otherProps,
-        'Fulfillment Status': order.fulfillment_status || 'unfulfilled',
+        'Order #':        `#${order.order_number}`,
+        'Date':           orderDate,
+        'Customer':       customer,
+        'Item':           total > 1 ? `${i + 1} of ${total}` : '1',
+        'Product':        item.title,
+        'Variant':        item.variant_title && item.variant_title !== 'Default Title' ? item.variant_title : '',
+        'Qty':            item.quantity,
+        'Greeting Card':  greetingCard,
+        'Ribbon & Bow':   ribbon,
+        'Message':        message,
+        'Other Add-ons':  otherProps,
+        'SKU':            item.sku || '',
+        'Status':         order.fulfillment_status || 'unfulfilled',
       };
       row['Packing Summary'] = packingSummary(row);
       rows.push(row);
     }
   }
   return rows;
+}
+
+// Returns rows with a null blank-line separator between each order — used for CSV export only.
+function ordersToCSVRows(orders) {
+  const csvRows = [];
+  const knownKeys = new Set(['greeting card', 'ribbon & bow', 'ribbon', 'personal message', 'message', 'note']);
+
+  for (let oi = 0; oi < orders.length; oi++) {
+    const order     = orders[oi];
+    const orderNote = (order.note || '').trim();
+    const orderDate = new Date(order.created_at).toLocaleDateString('en-GB', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    });
+    const customer = order.shipping_address
+      ? `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim()
+      : (order.email || '');
+    const total = order.line_items.length;
+
+    for (let i = 0; i < order.line_items.length; i++) {
+      const item  = order.line_items[i];
+      const props = item.properties || [];
+
+      const greetingCard = cleanCard(getProp(props, 'Greeting Card', 'greeting card'));
+      const ribbon       = cleanRibbon(getProp(props, 'Ribbon & Bow', 'ribbon & bow', 'ribbon'));
+      const message      = getProp(props, 'Personal Message', 'personal message', 'message', 'note') || orderNote;
+
+      const otherProps = props
+        .filter(p => !knownKeys.has(p.name.toLowerCase()) && !p.name.startsWith('_'))
+        .filter(p => p.value && !['none', 'no', ''].includes(p.value.toLowerCase()))
+        .map(p => `${p.name}: ${p.value}`)
+        .join(' | ');
+
+      const row = {
+        'Order #':        `#${order.order_number}`,
+        'Date':           orderDate,
+        'Customer':       customer,
+        'Item':           total > 1 ? `${i + 1} of ${total}` : '1',
+        'Product':        item.title,
+        'Variant':        item.variant_title && item.variant_title !== 'Default Title' ? item.variant_title : '',
+        'Qty':            item.quantity,
+        'Greeting Card':  greetingCard,
+        'Ribbon & Bow':   ribbon,
+        'Message':        message,
+        'Other Add-ons':  otherProps,
+        'SKU':            item.sku || '',
+        'Status':         order.fulfillment_status || 'unfulfilled',
+      };
+      row['Packing Summary'] = packingSummary(row);
+      csvRows.push(row);
+    }
+
+    // Blank separator row between orders (not after the last one)
+    if (oi < orders.length - 1) csvRows.push(null);
+  }
+
+  return csvRows;
 }
 
 async function fetchAllOrders({ startDate, endDate, fulfillmentStatus }) {
@@ -141,12 +202,14 @@ async function fetchAllOrders({ startDate, endDate, fulfillmentStatus }) {
 }
 
 function toCSV(rows) {
-  if (!rows.length) return '';
-  const headers = Object.keys(rows[0]);
-  const esc  = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const dataRows = rows.filter(r => r !== null);
+  if (!dataRows.length) return '';
+  const headers = Object.keys(dataRows[0]);
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  // null rows become a blank line — visually separates orders in Excel/Sheets
   return '﻿' + [
     headers.map(esc).join(','),
-    ...rows.map(r => headers.map(h => esc(r[h])).join(',')),
+    ...rows.map(r => r === null ? '' : headers.map(h => esc(r[h])).join(',')),
   ].join('\r\n');
 }
 
@@ -268,7 +331,7 @@ function requireToken(req, res, next) {
 app.get('/api/orders', requireToken, async (req, res) => {
   try {
     const orders = await fetchAllOrders(req.query);
-    const rows   = ordersToRows(orders);
+    const rows   = ordersToRows(orders);  // flat, no nulls — for web preview
     res.json({
       rows,
       stats: {
@@ -287,14 +350,15 @@ app.get('/api/orders', requireToken, async (req, res) => {
 
 app.get('/api/export', requireToken, async (req, res) => {
   try {
-    const orders = await fetchAllOrders(req.query);
-    const rows   = ordersToRows(orders);
-    if (!rows.length) return res.status(404).json({ error: 'No orders found.' });
+    const orders  = await fetchAllOrders(req.query);
+    const csvRows = ordersToCSVRows(orders);  // includes blank-line separators between orders
+    const dataRows = csvRows.filter(r => r !== null);
+    if (!dataRows.length) return res.status(404).json({ error: 'No orders found.' });
 
     const filename = `packing-report-${new Date().toISOString().slice(0, 10)}.csv`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(toCSV(rows));
+    res.send(toCSV(csvRows));
   } catch (e) {
     const msg = e.response?.data?.errors || e.message;
     console.error('Export error:', msg);
