@@ -10,7 +10,7 @@ const {
   SHOPIFY_STORE,
   SHOPIFY_API_KEY,
   SHOPIFY_API_SECRET,
-  HOST = 'http://localhost:3000',
+  HOST = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000',
 } = process.env;
 
 if (!SHOPIFY_STORE || !SHOPIFY_API_KEY || !SHOPIFY_API_SECRET) {
