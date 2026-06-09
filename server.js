@@ -34,7 +34,6 @@ app.use((_req, res, next) => {
   next();
 });
 
-app.use(express.json());
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -148,8 +147,6 @@ function buildOrderRows(order) {
       // ── Reference ────────────────────────────────────
       'View Order':      orderLink,
 
-      // Internal — stripped from CSV export (underscore prefix)
-      '_orderId':        String(order.id),
     };
     row['Packing Summary'] = packingSummary(row);
     return row;
@@ -274,7 +271,7 @@ app.get('/auth', (_req, res) => {
 
   const url = 'https://' + SHOPIFY_STORE + '/admin/oauth/authorize?' + new URLSearchParams({
     client_id:    SHOPIFY_API_KEY,
-    scope:        'read_orders,write_orders',
+    scope:        'read_orders',
     redirect_uri: redirectUri,
     state,
   });
@@ -408,48 +405,6 @@ app.get('/api/export', requireToken, async (req, res) => {
 app.get('/health', (_req, res) =>
   res.json({ ok: true, store: SHOPIFY_STORE, authenticated: !!ACCESS_TOKEN })
 );
-
-// ── Fulfillment ───────────────────────────────────────────────────────────────
-
-app.post('/api/fulfill', requireToken, async (req, res) => {
-  const { orderId } = req.body;
-  if (!orderId) return res.status(400).json({ error: 'orderId required' });
-
-  try {
-    // Step 1: get open fulfillment orders for this Shopify order
-    const foRes = await axios.get(
-      `https://${SHOPIFY_STORE}/admin/api/2025-01/orders/${orderId}/fulfillment_orders.json`,
-      { headers: { 'X-Shopify-Access-Token': ACCESS_TOKEN } }
-    );
-
-    const openFOs = (foRes.data.fulfillment_orders || [])
-      .filter(fo => fo.status === 'open');
-
-    if (!openFOs.length) {
-      return res.json({ success: false, message: 'Order is already fulfilled or has no open items.' });
-    }
-
-    // Step 2: create fulfillment covering all open fulfillment orders
-    await axios.post(
-      `https://${SHOPIFY_STORE}/admin/api/2025-01/fulfillments.json`,
-      {
-        fulfillment: {
-          line_items_by_fulfillment_order: openFOs.map(fo => ({
-            fulfillment_order_id: fo.id,
-          })),
-          notify_customer: false,
-        },
-      },
-      { headers: { 'X-Shopify-Access-Token': ACCESS_TOKEN } }
-    );
-
-    res.json({ success: true });
-  } catch (e) {
-    const msg = e.response?.data?.errors || e.message;
-    console.error('Fulfill error:', msg);
-    res.status(500).json({ success: false, error: String(msg) });
-  }
-});
 
 // ── Static files (served after API routes) ────────────────────────────────────
 
