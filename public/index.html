@@ -936,16 +936,16 @@
   /* ── Desktop table ── */
   function buildTable(rows) {
     const cols = [
-      { key: 'Order #',       th: 'Order #'          },
-      { key: 'Date',          th: 'Date'             },
-      { key: 'Customer',      th: 'Ship To'          },
-      { key: 'Item',          th: 'Item'             },
-      { key: 'Product',       th: 'Product'          },
-      { key: 'Qty',           th: 'Qty'              },
-      { key: 'Greeting Card', th: 'Greeting Card'    },
-      { key: 'Ribbon & Bow',  th: 'Ribbon &amp; Bow' },
-      { key: 'Message',       th: 'Message / Note'   },
-      { key: 'Status',        th: 'Status'           },
+      { key: 'Order #',        th: 'Order #'          },
+      { key: 'Date',           th: 'Date'             },
+      { key: 'Item',           th: 'Item'             },
+      { key: 'Product',        th: 'Product'          },
+      { key: 'Qty',            th: 'Qty'              },
+      { key: 'Greeting Card',  th: 'Greeting Card'    },
+      { key: 'Ribbon & Bow',   th: 'Ribbon &amp; Bow' },
+      { key: 'Message / Note', th: 'Message / Note'   },
+      { key: 'Ship To',        th: 'Ship To'          },
+      { key: 'Status',         th: 'Status'           },
     ];
 
     const head = `<thead><tr>${cols.map(c => `<th>${c.th}</th>`).join('')}</tr></thead>`;
@@ -963,18 +963,19 @@
     const cards = rows.map(row => {
       const ribbon  = row['Ribbon & Bow'];
       const card    = row['Greeting Card'];
-      const message = row['Message'];
+      const message = row['Message / Note'];
       const status  = row['Status'] || '';
       const statusCls = { fulfilled: 'b-fulfilled', unfulfilled: 'b-unfulfilled', partial: 'b-partial' }[status] || 'b-no';
 
-      const orderLink  = row['Order Link'] || '#';
+      const orderLink  = row['View Order'] || '#';
       const variantLine = row['Variant']
         ? `<div class="m-psub">${esc(row['Variant'])}${row['SKU'] ? ' · SKU: ' + esc(row['SKU']) : ''}</div>`
         : (row['SKU'] ? `<div class="m-psub">SKU: ${esc(row['SKU'])}</div>` : '');
+      const addrParts = [row['Address 1'], row['Address 2'], row['City'], row['Postcode'], row['Country']].filter(Boolean);
       const shippingLines = [
-        row['Address']  ? `<div>${esc(row['Address'])}</div>` : '',
-        row['Phone']    ? `<div>📞 ${esc(row['Phone'])}</div>` : '',
-        row['Email']    ? `<div>✉ ${esc(row['Email'])}</div>` : '',
+        addrParts.length      ? `<div>${esc(addrParts.join(', '))}</div>` : '',
+        row['Phone']          ? `<div>📞 ${esc(row['Phone'])}</div>` : '',
+        row['Email']          ? `<div>✉ ${esc(row['Email'])}</div>` : '',
       ].join('');
 
       const msgRow = message
@@ -985,7 +986,7 @@
       <div class="m-card">
         <div class="m-card-head">
           <a href="${esc(orderLink)}" target="_blank" rel="noopener" class="m-order" style="text-decoration:none;color:#fff">${esc(row['Order #'])} ↗</a>
-          <span class="m-meta">${esc(row['Date'])}<br>${esc(row['Customer'])}</span>
+          <span class="m-meta">${esc(row['Date'])}<br>${esc(row['Ship To'])}</span>
         </div>
         <div class="m-card-product">
           <div class="m-pname">${esc(row['Product'])}</div>
@@ -1036,10 +1037,11 @@
       }
       case 'Item':
         return `<td><span class="text-sub" style="white-space:nowrap">${esc(String(v))}</span></td>`;
-      case 'Customer': {
-        const addr  = row['Address'] ? `<div class="text-sub" style="max-width:180px">${esc(row['Address'])}</div>` : '';
-        const phone = row['Phone']   ? `<div class="text-sub">📞 ${esc(row['Phone'])}</div>` : '';
-        const email = row['Email']   ? `<div class="text-sub">✉ ${esc(row['Email'])}</div>` : '';
+      case 'Ship To': {
+        const addrParts = [row['Address 1'], row['Address 2'], row['City'], row['Postcode'], row['Country']].filter(Boolean);
+        const addr  = addrParts.length ? `<div class="text-sub" style="max-width:180px">${esc(addrParts.join(', '))}</div>` : '';
+        const phone = row['Phone'] ? `<div class="text-sub">📞 ${esc(row['Phone'])}</div>` : '';
+        const email = row['Email'] ? `<div class="text-sub">✉ ${esc(row['Email'])}</div>` : '';
         return `<td><div class="product-name">${esc(v)}</div>${addr}${phone}${email}</td>`;
       }
 
@@ -1061,7 +1063,7 @@
         return v === 'Yes'
           ? `<td><span class="badge b-yes">✓ Yes</span></td>`
           : `<td><span class="badge b-no">No</span></td>`;
-      case 'Message':
+      case 'Message / Note':
         return v
           ? `<td><span class="msg">"${esc(v)}"</span></td>`
           : `<td><span style="color:var(--border)">—</span></td>`;
@@ -1165,7 +1167,7 @@
   /* Returns a warning tag when qty > 1 AND there's a card or ribbon selected.
      Reminds the packing team: same add-ons apply to ALL units in this line item. */
   function multiQtyWarn(row) {
-    const qty    = Number(row['Qty']);
+    const qty      = Number(row['Qty']);
     const hasAddon = row['Greeting Card'] !== 'None' || row['Ribbon & Bow'] === 'Yes';
     if (qty < 2 || !hasAddon) return '';
     const parts = [];

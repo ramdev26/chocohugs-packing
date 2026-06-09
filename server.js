@@ -63,9 +63,8 @@ function packingSummary(row) {
   const parts   = [row['Order #'], `Qty ${qty}`, product];
   if (row['Greeting Card'] !== 'None') parts.push(row['Greeting Card'] + ' Card');
   parts.push(`Ribbon: ${row['Ribbon & Bow']}`);
-  if (row['Message']) parts.push(`Note: ${row['Message']}`);
+  if (row['Message / Note']) parts.push(`Note: ${row['Message / Note']}`);
 
-  // Flag multi-qty add-on items so packing team knows the same add-on applies to all units
   const hasAddon = row['Greeting Card'] !== 'None' || row['Ribbon & Bow'] === 'Yes';
   if (qty > 1 && hasAddon) parts.push(`⚠ SAME ADD-ONS FOR ALL ${qty} BOXES`);
 
@@ -114,29 +113,38 @@ function buildOrderRows(order) {
       .join(' | ');
 
     const row = {
-      'Order #':          `#${order.order_number}`,
-      'Order Link':       orderLink,
-      'Date':             orderDate,
-      'Customer':         customer,
-      'Email':            email,
-      'Phone':            phone,
-      'Address':          addrDisplay,
-      'Address 1':        addr.address1 || '',
-      'Address 2':        addr.address2 || '',
-      'City':             addr.city     || '',
-      'County':           addr.province || '',
-      'Postcode':         addr.zip      || '',
-      'Country':          addr.country  || '',
-      'Item':             total > 1 ? `${i + 1} of ${total}` : '1',
-      'Product':          item.title,
-      'Variant':          item.variant_title && item.variant_title !== 'Default Title' ? item.variant_title : '',
-      'SKU':              item.sku || '',
-      'Qty':              item.quantity,
-      'Greeting Card':    greetingCard,
-      'Ribbon & Bow':     ribbon,
-      'Message':          message,
-      'Other Add-ons':    otherProps,
-      'Status':           order.fulfillment_status || 'unfulfilled',
+      // ── Quick reference ──────────────────────────────
+      'Packing Summary': '',          // filled below after all fields set
+
+      // ── Order ────────────────────────────────────────
+      'Order #':         `#${order.order_number}`,
+      'Date':            orderDate,
+      'Status':          order.fulfillment_status || 'unfulfilled',
+      'Item':            total > 1 ? `${i + 1} of ${total}` : '1',
+
+      // ── What to pack ─────────────────────────────────
+      'Product':         item.title,
+      'Variant':         item.variant_title && item.variant_title !== 'Default Title' ? item.variant_title : '',
+      'SKU':             item.sku || '',
+      'Qty':             item.quantity,
+
+      // ── Add-ons (packing critical) ───────────────────
+      'Greeting Card':   greetingCard,
+      'Ribbon & Bow':    ribbon,
+      'Message / Note':  message,
+
+      // ── Ship to ──────────────────────────────────────
+      'Ship To':         customer,
+      'Phone':           phone,
+      'Address 1':       addr.address1 || '',
+      'Address 2':       addr.address2 || '',
+      'City':            addr.city     || '',
+      'Postcode':        addr.zip      || '',
+      'Country':         addr.country  || '',
+      'Email':           email,
+
+      // ── Reference ────────────────────────────────────
+      'View Order':      orderLink,
     };
     row['Packing Summary'] = packingSummary(row);
     return row;
