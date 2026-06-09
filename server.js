@@ -6,12 +6,14 @@ const path    = require('path');
 
 const app = express();
 
-const {
-  SHOPIFY_STORE,
-  SHOPIFY_API_KEY,
-  SHOPIFY_API_SECRET,
-  HOST = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000',
-} = process.env;
+const SHOPIFY_STORE      = process.env.SHOPIFY_STORE;
+const SHOPIFY_API_KEY    = process.env.SHOPIFY_API_KEY;
+const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET;
+
+// HOST must be set explicitly in Vercel env vars — do NOT rely on VERCEL_URL
+// as it changes per deployment and won't match the whitelisted redirect URI.
+const HOST = (process.env.HOST || '').replace(/\/$/, '') ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
 if (!SHOPIFY_STORE || !SHOPIFY_API_KEY || !SHOPIFY_API_SECRET) {
   console.error('ERROR: SHOPIFY_STORE, SHOPIFY_API_KEY, and SHOPIFY_API_SECRET must be set in .env');
@@ -147,6 +149,50 @@ function toCSV(rows) {
     ...rows.map(r => headers.map(h => esc(r[h])).join(',')),
   ].join('\r\n');
 }
+
+// ── Setup helper ─────────────────────────────────────────────────────────────
+
+app.get('/setup', (_req, res) => {
+  const callbackUrl = `${HOST}/auth/callback`;
+  res.send(`<!DOCTYPE html><html><head><title>Setup</title>
+<style>
+  body{font-family:-apple-system,sans-serif;max-width:560px;margin:60px auto;padding:20px;color:#202223}
+  h2{margin-bottom:16px}
+  .box{background:#f6f6f7;border:1px solid #e1e3e5;border-radius:8px;padding:16px;margin:12px 0}
+  code{display:block;background:#1a1a1a;color:#4ade80;padding:12px 16px;border-radius:6px;
+       font-size:13px;word-break:break-all;font-family:monospace;margin:8px 0;user-select:all}
+  .step{margin:16px 0;font-size:14px;line-height:1.7}
+  .num{display:inline-block;background:#008060;color:#fff;border-radius:50%;
+       width:22px;height:22px;text-align:center;line-height:22px;font-size:12px;
+       font-weight:bold;margin-right:8px}
+  .btn{display:inline-block;background:#008060;color:#fff;padding:10px 20px;
+       border-radius:6px;text-decoration:none;font-weight:600;margin-top:16px}
+  .warn{background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:10px 14px;font-size:13px;margin:12px 0}
+</style></head><body>
+<h2>🔧 Packing App — Setup</h2>
+
+${!HOST || HOST === 'http://localhost:3000' ? `
+<div class="warn">⚠️ <strong>HOST env var not set.</strong> Add your Vercel URL as HOST in Vercel → Settings → Environment Variables, then redeploy.</div>
+` : ''}
+
+<div class="step"><span class="num">1</span>Copy this exact callback URL:</div>
+<div class="box"><code>${callbackUrl}</code></div>
+
+<div class="step"><span class="num">2</span>In Shopify Admin → Settings → Apps → Develop apps → your app → <strong>Configuration</strong><br>
+Paste it into <strong>Allowed redirection URL(s)</strong> → Save</div>
+
+<div class="step"><span class="num">3</span>Make sure these Vercel env vars are set:
+<div class="box" style="font-size:13px;line-height:1.8">
+  SHOPIFY_STORE = <strong>${SHOPIFY_STORE || '❌ missing'}</strong><br>
+  SHOPIFY_API_KEY = <strong>${SHOPIFY_API_KEY ? SHOPIFY_API_KEY.slice(0,8) + '...' : '❌ missing'}</strong><br>
+  SHOPIFY_API_SECRET = <strong>${SHOPIFY_API_SECRET ? '✅ set' : '❌ missing'}</strong><br>
+  HOST = <strong>${HOST || '❌ missing'}</strong>
+</div></div>
+
+<div class="step"><span class="num">4</span>Once redirect URL is whitelisted in Shopify:</div>
+<a href="/auth" class="btn">Connect to Shopify →</a>
+</body></html>`);
+});
 
 // ── OAuth ─────────────────────────────────────────────────────────────────────
 
