@@ -57,11 +57,17 @@ function cleanCard(val) {
 }
 
 function packingSummary(row) {
+  const qty     = Number(row['Qty']);
   const product = row['Product'] + (row['Variant'] ? ` (${row['Variant']})` : '');
-  const parts = [row['Order #'], `Qty ${row['Qty']}`, product];
+  const parts   = [row['Order #'], `Qty ${qty}`, product];
   if (row['Greeting Card'] !== 'None') parts.push(row['Greeting Card'] + ' Card');
   parts.push(`Ribbon: ${row['Ribbon & Bow']}`);
   if (row['Message']) parts.push(`Note: ${row['Message']}`);
+
+  // Flag multi-qty add-on items so packing team knows the same add-on applies to all units
+  const hasAddon = row['Greeting Card'] !== 'None' || row['Ribbon & Bow'] === 'Yes';
+  if (qty > 1 && hasAddon) parts.push(`⚠ SAME ADD-ONS FOR ALL ${qty} BOXES`);
+
   return parts.join(' | ');
 }
 

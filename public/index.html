@@ -201,6 +201,23 @@
     .b-unfulfilled { background: var(--badge-warn);   color: var(--badge-warn-t); }
     .b-partial     { background: var(--badge-card);   color: var(--badge-card-t); }
 
+    /* ── Multi-qty add-on warning ── */
+    .qty-warn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      color: #7d4e00;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .qty-warn-icon { font-size: 12px; flex-shrink: 0; }
+
     /* ── State messages ── */
     .state { padding: 48px 20px; text-align: center; color: var(--sub); }
     .state .ico { font-size: 36px; margin-bottom: 10px; }
@@ -559,9 +576,10 @@
           ${variantLine}
         </div>
         <div class="m-card-addons">
-          <div class="m-addon">
+          <div class="m-addon ${multiQtyWarn(row) ? 'm-full' : ''}">
             <div class="m-addon-lbl">Qty</div>
             <strong style="font-size:18px">${esc(String(row['Qty']))}</strong>
+            ${multiQtyWarn(row)}
           </div>
           <div class="m-addon">
             <div class="m-addon-lbl">Item</div>
@@ -605,7 +623,10 @@
         return `<td><div class="product-name">${esc(v)}</div>${variant}${sku}</td>`;
       }
       case 'Qty':
-        return `<td class="qty">${esc(String(v))}</td>`;
+        return `<td class="qty" style="vertical-align:middle">
+          <div>${esc(String(v))}</div>
+          ${multiQtyWarn(row)}
+        </td>`;
       case 'Greeting Card':
         return v === 'None'
           ? `<td><span class="badge b-no">None</span></td>`
@@ -625,6 +646,18 @@
       default:
         return `<td>${esc(String(v))}</td>`;
     }
+  }
+
+  /* Returns a warning tag when qty > 1 AND there's a card or ribbon selected.
+     Reminds the packing team: same add-ons apply to ALL units in this line item. */
+  function multiQtyWarn(row) {
+    const qty    = Number(row['Qty']);
+    const hasAddon = row['Greeting Card'] !== 'None' || row['Ribbon & Bow'] === 'Yes';
+    if (qty < 2 || !hasAddon) return '';
+    const parts = [];
+    if (row['Greeting Card'] !== 'None') parts.push(`${qty}× ${esc(row['Greeting Card'])} card`);
+    if (row['Ribbon & Bow'] === 'Yes')   parts.push(`${qty}× ribbon`);
+    return `<div class="qty-warn"><span class="qty-warn-icon">⚠️</span>Same add-ons for all ${qty} boxes: ${parts.join(', ')}</div>`;
   }
 
   function fmtDate(iso) {
