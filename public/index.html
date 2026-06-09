@@ -8,22 +8,23 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --surface:    #ffffff;
-      --bg:         #f6f6f7;
-      --border:     #e1e3e5;
-      --text:       #202223;
-      --sub:        #6d7175;
-      --green:      #008060;
-      --green-dk:   #006e52;
-      --badge-yes:  #aee9d1;
-      --badge-yes-t:#0d3b2e;
-      --badge-no:   #f1f2f3;
-      --badge-no-t: #6d7175;
-      --badge-card: #e4f0ff;
+      --surface:     #ffffff;
+      --bg:          #f6f6f7;
+      --border:      #e1e3e5;
+      --text:        #202223;
+      --sub:         #6d7175;
+      --green:       #008060;
+      --green-dk:    #006e52;
+      --badge-yes:   #aee9d1;
+      --badge-yes-t: #0d3b2e;
+      --badge-no:    #f1f2f3;
+      --badge-no-t:  #6d7175;
+      --badge-card:  #e4f0ff;
       --badge-card-t:#0051c3;
-      --badge-warn: #ffd79d;
+      --badge-warn:  #ffd79d;
       --badge-warn-t:#4b3200;
-      --danger:     #d82c0d;
+      --danger:      #d82c0d;
+      --radius:      8px;
     }
 
     body {
@@ -31,42 +32,62 @@
       font-size: 14px;
       color: var(--text);
       background: var(--bg);
+      -webkit-font-smoothing: antialiased;
     }
 
     /* ── Header ── */
     .top-bar {
       background: #1a1a1a;
-      padding: 0 20px;
-      height: 56px;
+      padding: 0 16px;
+      height: 52px;
       display: flex;
       align-items: center;
       gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
-    .top-bar .logo { font-size: 22px; }
-    .top-bar h1 { color: #fff; font-size: 15px; font-weight: 600; }
-    .top-bar .store { color: #aaa; font-size: 13px; margin-left: 4px; }
+    .top-bar .logo { font-size: 20px; }
+    .top-bar h1    { color: #fff; font-size: 15px; font-weight: 600; }
+    .top-bar .store { color: #888; font-size: 13px; margin-left: 2px; }
 
     /* ── Page ── */
-    .page { padding: 20px; max-width: 1400px; margin: 0 auto; }
+    .page { padding: 16px; max-width: 1400px; margin: 0 auto; }
 
     /* ── Card ── */
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-bottom: 16px;
+      border-radius: var(--radius);
+      margin-bottom: 12px;
       overflow: hidden;
     }
-    .card-body  { padding: 16px 20px; }
+    .card-body { padding: 14px 16px; }
     .card-body + .card-body { border-top: 1px solid var(--border); }
 
     /* ── Filters ── */
-    .filters { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-    .field { display: flex; flex-direction: column; gap: 4px; min-width: 130px; }
-    .field label { font-size: 12px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: .04em; }
+    .filters {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      grid-template-rows: auto auto;
+      gap: 10px;
+      align-items: end;
+    }
+    .field-status { grid-column: 1 / 3; }
+    .field-load   { grid-column: 3; }
+    .field-actions { grid-column: 1 / 4; display: flex; gap: 8px; }
+
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--sub);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
     .field input,
     .field select {
-      height: 36px;
+      height: 40px;
       padding: 0 10px;
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -74,13 +95,22 @@
       color: var(--text);
       background: var(--surface);
       outline: none;
+      width: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236d7175' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 30px;
     }
     .field input:focus,
-    .field select:focus { border-color: #8c9196; box-shadow: 0 0 0 3px #e4e5e7; }
+    .field select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(0,128,96,.12); }
 
     /* ── Buttons ── */
     .btn {
-      height: 36px;
+      height: 40px;
       padding: 0 16px;
       border-radius: 6px;
       font-size: 14px;
@@ -89,38 +119,48 @@
       border: 1px solid transparent;
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
       text-decoration: none;
       white-space: nowrap;
       transition: background .12s, border-color .12s;
+      -webkit-tap-highlight-color: transparent;
     }
-    .btn-primary  { background: var(--green);   color: #fff; border-color: var(--green); }
-    .btn-primary:hover { background: var(--green-dk); border-color: var(--green-dk); }
-    .btn-plain    { background: var(--surface); color: var(--text); border-color: var(--border); }
-    .btn-plain:hover { background: var(--bg); }
+    .btn-primary { background: var(--green); color: #fff; border-color: var(--green); }
+    .btn-primary:hover, .btn-primary:active { background: var(--green-dk); border-color: var(--green-dk); }
+    .btn-plain   { background: var(--surface); color: var(--text); border-color: var(--border); }
+    .btn-plain:hover, .btn-plain:active { background: var(--bg); }
     .btn[disabled], .btn:disabled { opacity: .45; pointer-events: none; }
-    .btn-row { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+    .btn-full { width: 100%; }
+    #exportBtn, #printBtn { flex: 1; }
 
     /* ── Stats ── */
-    .stats { display: flex; }
-    .stat { flex: 1; padding: 14px 20px; border-right: 1px solid var(--border); }
-    .stat:last-child { border-right: none; }
-    .stat-val { font-size: 26px; font-weight: 700; }
-    .stat-lbl { font-size: 12px; color: var(--sub); margin-top: 2px; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; }
+    .stat {
+      padding: 14px 16px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stat:nth-child(even)  { border-right: none; }
+    .stat:nth-child(3),
+    .stat:nth-child(4)     { border-bottom: none; }
+    .stat-val { font-size: 24px; font-weight: 700; line-height: 1; }
+    .stat-lbl { font-size: 12px; color: var(--sub); margin-top: 4px; }
 
     /* ── Table bar ── */
     .table-bar {
-      padding: 10px 20px;
+      padding: 10px 16px;
       border-bottom: 1px solid var(--border);
+      background: var(--bg);
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      background: var(--bg);
+      flex-wrap: wrap;
+      gap: 6px;
     }
     .table-bar span { font-size: 13px; font-weight: 600; color: var(--sub); }
 
-    /* ── Table ── */
-    .tbl-wrap { overflow-x: auto; }
+    /* ── Desktop Table ── */
+    .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     thead th {
       text-align: left;
@@ -139,11 +179,11 @@
     tbody tr:hover { background: #fafafa; }
     td { padding: 10px 12px; vertical-align: top; }
 
-    .order-num { font-weight: 700; color: var(--green); font-size: 13px; white-space: nowrap; }
+    .order-num   { font-weight: 700; color: var(--green); font-size: 13px; white-space: nowrap; }
     .product-name { font-weight: 600; }
-    .text-sub { color: var(--sub); font-size: 12px; }
-    td.qty { font-weight: 700; text-align: center; font-size: 15px; }
-    .msg { color: var(--sub); font-style: italic; max-width: 180px; font-size: 12px; line-height: 1.4; }
+    .text-sub    { color: var(--sub); font-size: 12px; }
+    td.qty       { font-weight: 700; text-align: center; font-size: 15px; }
+    .msg         { color: var(--sub); font-style: italic; max-width: 180px; font-size: 12px; line-height: 1.4; }
 
     /* ── Badges ── */
     .badge {
@@ -154,22 +194,18 @@
       font-weight: 600;
       white-space: nowrap;
     }
-    .b-yes     { background: var(--badge-yes);    color: var(--badge-yes-t); }
-    .b-no      { background: var(--badge-no);     color: var(--badge-no-t); }
-    .b-card    { background: var(--badge-card);   color: var(--badge-card-t); }
-    .b-fulfilled   { background: var(--badge-yes);  color: var(--badge-yes-t); }
-    .b-unfulfilled { background: var(--badge-warn); color: var(--badge-warn-t); }
-    .b-partial     { background: var(--badge-card); color: var(--badge-card-t); }
+    .b-yes         { background: var(--badge-yes);    color: var(--badge-yes-t); }
+    .b-no          { background: var(--badge-no);     color: var(--badge-no-t); }
+    .b-card        { background: var(--badge-card);   color: var(--badge-card-t); }
+    .b-fulfilled   { background: var(--badge-yes);    color: var(--badge-yes-t); }
+    .b-unfulfilled { background: var(--badge-warn);   color: var(--badge-warn-t); }
+    .b-partial     { background: var(--badge-card);   color: var(--badge-card-t); }
 
     /* ── State messages ── */
-    .state {
-      padding: 48px 20px;
-      text-align: center;
-      color: var(--sub);
-    }
+    .state { padding: 48px 20px; text-align: center; color: var(--sub); }
     .state .ico { font-size: 36px; margin-bottom: 10px; }
-    .state p { font-size: 14px; }
-    .err-txt { color: var(--danger); font-weight: 500; }
+    .state p    { font-size: 14px; }
+    .err-txt    { color: var(--danger); font-weight: 500; }
 
     /* ── Spinner ── */
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -183,6 +219,96 @@
       flex-shrink: 0;
     }
 
+    /* ═══════════════════════════════════════════════
+       MOBILE  ≤ 680px
+    ═══════════════════════════════════════════════ */
+    @media (max-width: 680px) {
+
+      .page { padding: 10px; }
+
+      /* Filters: full-width stack */
+      .filters {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto auto;
+      }
+      .field-status  { grid-column: 1 / 3; }
+      .field-load    { grid-column: 1 / 3; }
+      .field-load .btn { width: 100%; }
+      .field-actions { grid-column: 1 / 3; }
+
+      /* Stats: already 2×2, just shrink padding */
+      .stat { padding: 12px; }
+      .stat-val { font-size: 20px; }
+
+      /* Hide desktop table, show mobile cards */
+      .tbl-wrap table  { display: none; }
+      .tbl-wrap .m-cards { display: block; }
+    }
+
+    /* ═══════════════════════════════════════════════
+       MOBILE CARDS (hidden on desktop, shown on mobile)
+    ═══════════════════════════════════════════════ */
+    .m-cards { display: none; padding: 10px; }
+
+    .m-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+
+    /* Card header — order number + meta */
+    .m-card-head {
+      background: #1a1a1a;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .m-card-head .m-order { color: #fff; font-weight: 700; font-size: 14px; }
+    .m-card-head .m-meta  { color: #aaa; font-size: 12px; text-align: right; line-height: 1.4; }
+
+    /* Product row */
+    .m-card-product {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: #fafafa;
+    }
+    .m-card-product .m-pname { font-weight: 700; font-size: 14px; }
+    .m-card-product .m-psub  { font-size: 12px; color: var(--sub); margin-top: 2px; }
+
+    /* Add-ons grid */
+    .m-card-addons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+    .m-addon {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+    .m-addon:nth-child(even) { border-right: none; }
+    .m-addon:last-child,
+    .m-addon:nth-last-child(2):nth-child(odd) { border-bottom: none; }
+    .m-addon-lbl {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--sub);
+      margin-bottom: 5px;
+    }
+
+    /* Message spans full width */
+    .m-addon.m-full {
+      grid-column: 1 / 3;
+      border-right: none;
+    }
+    .m-msg { font-style: italic; color: var(--sub); font-size: 13px; line-height: 1.4; }
+
     /* ── Print ── */
     .print-header { display: none; }
     @media print {
@@ -194,12 +320,13 @@
       .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       thead th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       tbody tr { page-break-inside: avoid; }
+      .m-cards { display: none !important; }
+      .tbl-wrap table { display: table !important; }
     }
   </style>
 </head>
 <body>
 
-<!-- Header -->
 <div class="top-bar">
   <span class="logo">🍫</span>
   <h1>Packing Report</h1>
@@ -223,7 +350,7 @@
           <input type="date" id="dateTo">
         </div>
 
-        <div class="field">
+        <div class="field field-status">
           <label>Fulfilment Status</label>
           <select id="statusSel">
             <option value="unfulfilled">Unfulfilled only</option>
@@ -233,17 +360,13 @@
           </select>
         </div>
 
-        <div style="padding-bottom:0; align-self:flex-end;">
+        <div class="field field-load" style="align-self:end;">
           <button class="btn btn-primary" id="loadBtn" onclick="loadOrders()">Load Orders</button>
         </div>
 
-        <div class="btn-row">
-          <a class="btn btn-plain" id="exportBtn" href="#" onclick="return false;" disabled>
-            ⬇&nbsp;Export CSV
-          </a>
-          <button class="btn btn-plain" id="printBtn" onclick="window.print()" disabled>
-            🖨&nbsp;Print
-          </button>
+        <div class="field-actions no-print">
+          <a class="btn btn-plain" id="exportBtn" href="#" onclick="return false;" disabled>⬇ Export CSV</a>
+          <button class="btn btn-plain" id="printBtn" onclick="window.print()" disabled>🖨 Print</button>
         </div>
 
       </div>
@@ -272,7 +395,7 @@
     </div>
   </div>
 
-  <!-- Table card -->
+  <!-- Table / Cards -->
   <div class="card">
     <div class="table-bar">
       <span id="tableLabel">Select filters and click Load Orders</span>
@@ -286,10 +409,9 @@
     </div>
   </div>
 
-</div><!-- /page -->
+</div>
 
 <script>
-  /* ── Init dates to today ── */
   const todayISO = new Date().toISOString().slice(0, 10);
   document.getElementById('dateFrom').value = todayISO;
   document.getElementById('dateTo').value   = todayISO;
@@ -298,20 +420,20 @@
 
   function params() {
     return new URLSearchParams({
-      startDate:          document.getElementById('dateFrom').value,
-      endDate:            document.getElementById('dateTo').value,
-      fulfillmentStatus:  document.getElementById('statusSel').value,
+      startDate:         document.getElementById('dateFrom').value,
+      endDate:           document.getElementById('dateTo').value,
+      fulfillmentStatus: document.getElementById('statusSel').value,
     }).toString();
   }
 
   async function loadOrders() {
-    const loadBtn   = document.getElementById('loadBtn');
-    const tblWrap   = document.getElementById('tblWrap');
+    const loadBtn    = document.getElementById('loadBtn');
+    const tblWrap    = document.getElementById('tblWrap');
     const tableLabel = document.getElementById('tableLabel');
 
     loadBtn.disabled = true;
-    loadBtn.innerHTML = '<span class="spin"></span>&nbsp;Loading…';
-    tblWrap.innerHTML = '<div class="state"><span class="spin"></span><p style="margin-top:14px">Fetching orders from Shopify…</p></div>';
+    loadBtn.innerHTML = '<span class="spin"></span> Loading…';
+    tblWrap.innerHTML = '<div class="state"><span class="spin"></span><p style="margin-top:14px">Fetching orders…</p></div>';
     document.getElementById('statsCard').style.display = 'none';
     setActionBtns(false);
 
@@ -321,12 +443,11 @@
       const res  = await fetch('/api/orders?' + lastParams);
       const data = await res.json();
 
-      // Not authenticated — redirect to Shopify OAuth
       if (res.status === 401) {
         tblWrap.innerHTML = `<div class="state">
           <div class="ico">🔐</div>
           <p style="margin-bottom:14px">App not connected to Shopify yet.</p>
-          <a href="/auth" class="btn btn-primary" style="text-decoration:none">Connect to Shopify</a>
+          <a href="/auth" class="btn btn-primary">Connect to Shopify</a>
         </div>`;
         tableLabel.textContent = 'Authentication required';
         return;
@@ -336,7 +457,6 @@
 
       const { rows, stats } = data;
 
-      /* Stats */
       document.getElementById('sOrders').textContent  = stats.orderCount;
       document.getElementById('sItems').textContent   = stats.rowCount;
       document.getElementById('sCards').textContent   = stats.withCard;
@@ -350,17 +470,16 @@
       }
 
       tableLabel.textContent =
-        `${rows.length} line item${rows.length !== 1 ? 's' : ''} across ${stats.orderCount} order${stats.orderCount !== 1 ? 's' : ''}`;
+        `${rows.length} item${rows.length !== 1 ? 's' : ''} across ${stats.orderCount} order${stats.orderCount !== 1 ? 's' : ''}`;
 
-      tblWrap.innerHTML = buildTable(rows);
+      // Render both table (desktop) and cards (mobile) — CSS shows the right one
+      tblWrap.innerHTML = buildTable(rows) + buildCards(rows);
 
-      /* Print heading */
       const from = document.getElementById('dateFrom').value;
       const to   = document.getElementById('dateTo').value;
       document.getElementById('printHeader').textContent =
         `Packing Report — Choco Hugs | ${fmtDate(from)}${from !== to ? ' – ' + fmtDate(to) : ''}`;
 
-      /* Enable action buttons */
       setActionBtns(true, '/api/export?' + lastParams);
 
     } catch (e) {
@@ -387,70 +506,125 @@
     }
   }
 
+  /* ── Desktop table ── */
   function buildTable(rows) {
     const cols = [
-      { key: 'Order #',       th: 'Order #'         },
-      { key: 'Date',          th: 'Date'            },
-      { key: 'Customer',      th: 'Customer'        },
-      { key: 'Item',          th: 'Item'            },
-      { key: 'Product',       th: 'Product'         },
-      { key: 'Qty',           th: 'Qty'             },
-      { key: 'Greeting Card', th: 'Greeting Card'   },
-      { key: 'Ribbon & Bow',  th: 'Ribbon &amp; Bow'},
-      { key: 'Message',       th: 'Message / Note'  },
-      { key: 'Status',        th: 'Status'          },
+      { key: 'Order #',       th: 'Order #'          },
+      { key: 'Date',          th: 'Date'             },
+      { key: 'Customer',      th: 'Customer'         },
+      { key: 'Item',          th: 'Item'             },
+      { key: 'Product',       th: 'Product'          },
+      { key: 'Qty',           th: 'Qty'              },
+      { key: 'Greeting Card', th: 'Greeting Card'    },
+      { key: 'Ribbon & Bow',  th: 'Ribbon &amp; Bow' },
+      { key: 'Message',       th: 'Message / Note'   },
+      { key: 'Status',        th: 'Status'           },
     ];
 
     const head = `<thead><tr>${cols.map(c => `<th>${c.th}</th>`).join('')}</tr></thead>`;
 
     const body = rows.map(row => {
-      const cells = cols.map(({ key }) => {
-        const v = row[key] ?? '';
-        switch (key) {
-
-          case 'Order #':
-            return `<td><span class="order-num">${esc(v)}</span></td>`;
-
-          case 'Item':
-            return `<td><span class="text-sub" style="white-space:nowrap">${esc(String(v))}</span></td>`;
-
-          case 'Product': {
-            const variant = row['Variant'] ? `<div class="text-sub">${esc(row['Variant'])}</div>` : '';
-            const sku     = row['SKU']     ? `<div class="text-sub">SKU: ${esc(row['SKU'])}</div>` : '';
-            return `<td><div class="product-name">${esc(v)}</div>${variant}${sku}</td>`;
-          }
-
-          case 'Qty':
-            return `<td class="qty">${esc(String(v))}</td>`;
-
-          case 'Greeting Card':
-            return v === 'None'
-              ? `<td><span class="badge b-no">None</span></td>`
-              : `<td><span class="badge b-card">${esc(v)}</span></td>`;
-
-          case 'Ribbon & Bow':
-            return v === 'Yes'
-              ? `<td><span class="badge b-yes">✓ Yes</span></td>`
-              : `<td><span class="badge b-no">No</span></td>`;
-
-          case 'Message':
-            return v
-              ? `<td><span class="msg">"${esc(v)}"</span></td>`
-              : `<td><span style="color:var(--border)">—</span></td>`;
-
-          case 'Status': {
-            const cls = { fulfilled: 'b-fulfilled', unfulfilled: 'b-unfulfilled', partial: 'b-partial' }[v] || 'b-no';
-            return `<td><span class="badge ${cls}">${esc(v.charAt(0).toUpperCase() + v.slice(1))}</span></td>`;
-          }
-
-          default:
-            return `<td>${esc(String(v))}</td>`;
-        }
-      }).join('');
+      const cells = cols.map(({ key }) => renderCell(key, row)).join('');
       return `<tr>${cells}</tr>`;
     }).join('');
 
     return `<table>${head}<tbody>${body}</tbody></table>`;
+  }
+
+  /* ── Mobile cards ── */
+  function buildCards(rows) {
+    const cards = rows.map(row => {
+      const ribbon  = row['Ribbon & Bow'];
+      const card    = row['Greeting Card'];
+      const message = row['Message'];
+      const status  = row['Status'] || '';
+      const statusCls = { fulfilled: 'b-fulfilled', unfulfilled: 'b-unfulfilled', partial: 'b-partial' }[status] || 'b-no';
+
+      const variantLine = row['Variant']
+        ? `<div class="m-psub">${esc(row['Variant'])}${row['SKU'] ? ' · SKU: ' + esc(row['SKU']) : ''}</div>`
+        : (row['SKU'] ? `<div class="m-psub">SKU: ${esc(row['SKU'])}</div>` : '');
+
+      const msgRow = message
+        ? `<div class="m-addon m-full"><div class="m-addon-lbl">Message / Note</div><div class="m-msg">"${esc(message)}"</div></div>`
+        : '';
+
+      return `
+      <div class="m-card">
+        <div class="m-card-head">
+          <span class="m-order">${esc(row['Order #'])}</span>
+          <span class="m-meta">${esc(row['Date'])}<br>${esc(row['Customer'])}</span>
+        </div>
+        <div class="m-card-product">
+          <div class="m-pname">${esc(row['Product'])}</div>
+          ${variantLine}
+        </div>
+        <div class="m-card-addons">
+          <div class="m-addon">
+            <div class="m-addon-lbl">Qty</div>
+            <strong style="font-size:18px">${esc(String(row['Qty']))}</strong>
+          </div>
+          <div class="m-addon">
+            <div class="m-addon-lbl">Item</div>
+            <span class="text-sub">${esc(String(row['Item']))}</span>
+          </div>
+          <div class="m-addon">
+            <div class="m-addon-lbl">Greeting Card</div>
+            ${card === 'None'
+              ? '<span class="badge b-no">None</span>'
+              : `<span class="badge b-card">${esc(card)}</span>`}
+          </div>
+          <div class="m-addon">
+            <div class="m-addon-lbl">Ribbon &amp; Bow</div>
+            ${ribbon === 'Yes'
+              ? '<span class="badge b-yes">✓ Yes</span>'
+              : '<span class="badge b-no">No</span>'}
+          </div>
+          ${msgRow}
+          <div class="m-addon m-full" style="border-bottom:none;">
+            <div class="m-addon-lbl">Status</div>
+            <span class="badge ${statusCls}">${esc(status.charAt(0).toUpperCase() + status.slice(1))}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="m-cards">${cards}</div>`;
+  }
+
+  /* ── Shared cell renderer (used by desktop table) ── */
+  function renderCell(key, row) {
+    const v = row[key] ?? '';
+    switch (key) {
+      case 'Order #':
+        return `<td><span class="order-num">${esc(v)}</span></td>`;
+      case 'Item':
+        return `<td><span class="text-sub" style="white-space:nowrap">${esc(String(v))}</span></td>`;
+      case 'Product': {
+        const variant = row['Variant'] ? `<div class="text-sub">${esc(row['Variant'])}</div>` : '';
+        const sku     = row['SKU']     ? `<div class="text-sub">SKU: ${esc(row['SKU'])}</div>` : '';
+        return `<td><div class="product-name">${esc(v)}</div>${variant}${sku}</td>`;
+      }
+      case 'Qty':
+        return `<td class="qty">${esc(String(v))}</td>`;
+      case 'Greeting Card':
+        return v === 'None'
+          ? `<td><span class="badge b-no">None</span></td>`
+          : `<td><span class="badge b-card">${esc(v)}</span></td>`;
+      case 'Ribbon & Bow':
+        return v === 'Yes'
+          ? `<td><span class="badge b-yes">✓ Yes</span></td>`
+          : `<td><span class="badge b-no">No</span></td>`;
+      case 'Message':
+        return v
+          ? `<td><span class="msg">"${esc(v)}"</span></td>`
+          : `<td><span style="color:var(--border)">—</span></td>`;
+      case 'Status': {
+        const cls = { fulfilled: 'b-fulfilled', unfulfilled: 'b-unfulfilled', partial: 'b-partial' }[v] || 'b-no';
+        return `<td><span class="badge ${cls}">${esc(v.charAt(0).toUpperCase() + v.slice(1))}</span></td>`;
+      }
+      default:
+        return `<td>${esc(String(v))}</td>`;
+    }
   }
 
   function fmtDate(iso) {
@@ -460,10 +634,8 @@
 
   function esc(s) {
     return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 </script>
 </body>
