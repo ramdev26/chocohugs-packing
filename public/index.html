@@ -423,6 +423,28 @@
     }
     .m-msg { font-style: italic; color: var(--sub); font-size: 13px; line-height: 1.4; }
 
+    /* ── Fulfil button ── */
+    .fulfil-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 26px;
+      padding: 0 10px;
+      background: var(--green);
+      color: #fff;
+      border: none;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .12s, opacity .12s;
+    }
+    .fulfil-btn:hover   { background: var(--green-dk); }
+    .fulfil-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .fulfil-btn.loading { background: #aaa; }
+    .status-cell        { vertical-align: middle; }
+
     /* ── Bundle Analytics Modal ── */
     .modal-overlay {
       position: fixed;
@@ -952,7 +974,7 @@
 
     const body = rows.map(row => {
       const cells = cols.map(({ key }) => renderCell(key, row)).join('');
-      return `<tr>${cells}</tr>`;
+      return `<tr data-order-id="${esc(row['_orderId'] || '')}">${cells}</tr>`;
     }).join('');
 
     return `<table>${head}<tbody>${body}</tbody></table>`;
@@ -982,8 +1004,10 @@
         ? `<div class="m-addon m-full"><div class="m-addon-lbl">Message / Note</div><div class="m-msg">"${esc(message)}"</div></div>`
         : '';
 
+      const orderId  = row['_orderId'] || '';
+      const canFulfil = status === 'unfulfilled' || status === 'partial';
       return `
-      <div class="m-card">
+      <div class="m-card" data-order-id="${esc(orderId)}">
         <div class="m-card-head">
           <a href="${esc(orderLink)}" target="_blank" rel="noopener" class="m-order" style="text-decoration:none;color:#fff">${esc(row['Order #'])} ↗</a>
           <span class="m-meta">${esc(row['Date'])}<br>${esc(row['Ship To'])}</span>
@@ -1016,9 +1040,12 @@
               : '<span class="badge b-no">No</span>'}
           </div>
           ${msgRow}
-          <div class="m-addon m-full" style="border-bottom:none;">
+          <div class="m-addon m-full status-cell" data-order-id="${esc(orderId)}" style="border-bottom:none;">
             <div class="m-addon-lbl">Status</div>
-            <span class="badge ${statusCls}">${esc(status.charAt(0).toUpperCase() + status.slice(1))}</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span class="badge ${statusCls} status-badge">${esc(status.charAt(0).toUpperCase() + status.slice(1))}</span>
+              ${canFulfil ? `<button class="fulfil-btn" onclick="fulfillOrder('${esc(orderId)}','${esc(row['Order #'])}',this)">✓ Mark Fulfilled</button>` : ''}
+            </div>
           </div>
         </div>
       </div>`;
@@ -1069,7 +1096,14 @@
           : `<td><span style="color:var(--border)">—</span></td>`;
       case 'Status': {
         const cls = { fulfilled: 'b-fulfilled', unfulfilled: 'b-unfulfilled', partial: 'b-partial' }[v] || 'b-no';
-        return `<td><span class="badge ${cls}">${esc(v.charAt(0).toUpperCase() + v.slice(1))}</span></td>`;
+        const canFulfil = v === 'unfulfilled' || v === 'partial';
+        const btn = canFulfil
+          ? `<button class="fulfil-btn" onclick="fulfillOrder('${esc(row['_orderId'])}','${esc(row['Order #'])}',this)" title="Mark as fulfilled">✓ Fulfil</button>`
+          : '';
+        return `<td class="status-cell" data-order-id="${esc(row['_orderId'] || '')}">
+          <span class="badge ${cls} status-badge">${esc(v.charAt(0).toUpperCase() + v.slice(1))}</span>
+          ${btn}
+        </td>`;
       }
       default:
         return `<td>${esc(String(v))}</td>`;
@@ -1163,6 +1197,45 @@
   }
 
   function pct(val, max) { return max ? Math.max(4, Math.round((val / max) * 100)) : 4; }
+
+  /* ── Fulfil order ── */
+  async function fulfillOrder(orderId, orderNum, btn) {
+    if (!orderId) return;
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.textContent = '⏳ Fulfilling…';
+
+    try {
+      const res  = await fetch('/api/fulfill', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ orderId }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || data.message || 'Could not fulfil order.');
+      }
+
+      // Update every row/card that belongs to this order
+      document.querySelectorAll(`[data-order-id="${orderId}"] .status-badge`).forEach(badge => {
+        badge.className   = 'badge b-fulfilled status-badge';
+        badge.textContent = 'Fulfilled';
+      });
+      document.querySelectorAll(`[data-order-id="${orderId}"] .fulfil-btn`).forEach(b => b.remove());
+
+      // Also update allRows in memory so filters still work
+      allRows.forEach(r => {
+        if (r['_orderId'] === orderId) r['Status'] = 'fulfilled';
+      });
+
+    } catch (e) {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.textContent = '✓ Fulfil';
+      alert(`Could not fulfil ${orderNum}:\n${e.message}`);
+    }
+  }
 
   /* Returns a warning tag when qty > 1 AND there's a card or ribbon selected.
      Reminds the packing team: same add-ons apply to ALL units in this line item. */
