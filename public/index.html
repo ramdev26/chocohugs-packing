@@ -135,6 +135,29 @@
     .btn-full { width: 100%; }
     #exportBtn, #printBtn { flex: 1; }
 
+    /* ── Refine filters row ── */
+    .refine-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding-top: 12px;
+      margin-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .refine-lbl {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--sub);
+      align-self: flex-end;
+      padding-bottom: 10px;
+      white-space: nowrap;
+    }
+    .refine-row .field { flex: 1; min-width: 150px; }
+    .active-filter select { border-color: var(--green); background-color: #f0fdf8; }
+
     /* ── Stats ── */
     .stats { display: grid; grid-template-columns: 1fr 1fr; }
     .stat {
@@ -539,6 +562,32 @@
         </div>
 
       </div>
+
+      <!-- Add-on filters — shown after data loads -->
+      <div class="refine-row" id="refineRow" style="display:none;">
+        <span class="refine-lbl">Filter results:</span>
+
+        <div class="field" id="cardFilterWrap">
+          <label>Greeting Card</label>
+          <select id="cardFilter" onchange="applyFilters()">
+            <option value="all">All Cards</option>
+          </select>
+        </div>
+
+        <div class="field" id="ribbonFilterWrap">
+          <label>Ribbon &amp; Bow</label>
+          <select id="ribbonFilter" onchange="applyFilters()">
+            <option value="all">All</option>
+            <option value="Yes">Yes — with ribbon</option>
+            <option value="No">No — without ribbon</option>
+          </select>
+        </div>
+
+        <div style="align-self:flex-end;">
+          <button class="btn btn-plain" onclick="resetAddOnFilters()">↺ Reset</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -632,6 +681,7 @@
 
   let lastParams  = null;
   let lastRevenue = null;
+  let allRows     = [];   // full unfiltered set — used by applyFilters()
   let salesChart  = null;
   let convChart   = null;
 
@@ -653,6 +703,8 @@
     tblWrap.innerHTML = '<div class="state"><span class="spin"></span><p style="margin-top:14px">Fetching orders…</p></div>';
     document.getElementById('statsCard').style.display = 'none';
     document.getElementById('analyticsSection').style.display = 'none';
+    document.getElementById('refineRow').style.display = 'none';
+    allRows = [];
     setActionBtns(false);
 
     lastParams = params();
@@ -691,9 +743,13 @@
       tableLabel.textContent =
         `${rows.length} item${rows.length !== 1 ? 's' : ''} across ${stats.orderCount} order${stats.orderCount !== 1 ? 's' : ''}`;
 
-      // Render both table (desktop) and cards (mobile) — CSS shows the right one
-      tblWrap.innerHTML = buildTable(rows) + buildCards(rows);
-      buildAnalytics(rows);
+      // Store full rows and populate add-on filters
+      allRows = rows;
+      populateCardFilter(rows);
+      document.getElementById('refineRow').style.display = '';
+
+      // Render (through applyFilters so any existing filter selection is respected)
+      applyFilters();
 
       const from = document.getElementById('dateFrom').value;
       const to   = document.getElementById('dateTo').value;
@@ -701,6 +757,7 @@
         `Packing Report — Choco Hugs | ${fmtDate(from)}${from !== to ? ' – ' + fmtDate(to) : ''}`;
 
       setActionBtns(true, '/api/export?' + lastParams);
+      // Note: table rendering happens inside applyFilters() called above
 
     } catch (e) {
       tableLabel.textContent = 'Error loading orders';
@@ -820,6 +877,61 @@
   }
 
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBundle(); });
+
+  /* ── Populate Greeting Card filter from loaded data ── */
+  function populateCardFilter(rows) {
+    const sel = document.getElementById('cardFilter');
+    const current = sel.value;
+    const types = [...new Set(rows.map(r => r['Greeting Card']))].sort((a, b) => {
+      if (a === 'None') return 1;
+      if (b === 'None') return -1;
+      return a.localeCompare(b);
+    });
+    sel.innerHTML = '<option value="all">All Cards</option>' +
+      types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+    // Restore previous selection if still valid
+    if ([...sel.options].some(o => o.value === current)) sel.value = current;
+  }
+
+  /* ── Filter + re-render from allRows ── */
+  function applyFilters() {
+    if (!allRows.length) return;
+
+    const cardVal   = document.getElementById('cardFilter').value;
+    const ribbonVal = document.getElementById('ribbonFilter').value;
+
+    const filtered = allRows.filter(row => {
+      const cardOk   = cardVal   === 'all' || row['Greeting Card'] === cardVal;
+      const ribbonOk = ribbonVal === 'all' || row['Ribbon & Bow']  === ribbonVal;
+      return cardOk && ribbonOk;
+    });
+
+    // Highlight active filters
+    document.getElementById('cardFilterWrap').classList.toggle('active-filter',   cardVal   !== 'all');
+    document.getElementById('ribbonFilterWrap').classList.toggle('active-filter', ribbonVal !== 'all');
+
+    // Update table label
+    const uniqueOrders = new Set(filtered.map(r => r['Order #'])).size;
+    const isFiltered   = cardVal !== 'all' || ribbonVal !== 'all';
+    document.getElementById('tableLabel').textContent = filtered.length
+      ? `${filtered.length} item${filtered.length !== 1 ? 's' : ''} across ${uniqueOrders} order${uniqueOrders !== 1 ? 's' : ''}${isFiltered ? ` (filtered from ${allRows.length})` : ''}`
+      : 'No items match the selected filters';
+
+    // Re-render table and analytics
+    document.getElementById('tblWrap').innerHTML =
+      filtered.length
+        ? buildTable(filtered) + buildCards(filtered)
+        : '<div class="state"><div class="ico">🔍</div><p>No items match the selected add-on filters.</p></div>';
+
+    buildAnalytics(filtered);
+  }
+
+  /* ── Reset add-on filters ── */
+  function resetAddOnFilters() {
+    document.getElementById('cardFilter').value   = 'all';
+    document.getElementById('ribbonFilter').value = 'all';
+    applyFilters();
+  }
 
   /* ── Desktop table ── */
   function buildTable(rows) {
