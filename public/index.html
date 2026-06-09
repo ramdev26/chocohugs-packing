@@ -985,7 +985,7 @@
       return `
       <div class="m-card">
         <div class="m-card-head">
-          <a href="${esc(orderLink)}" target="_blank" rel="noopener" class="m-order" style="text-decoration:none;color:#fff">${esc(row['Order #'])} ↗</a>
+          <span class="m-order" style="cursor:pointer" onclick="goToOrder('${esc(orderLink)}')">${esc(row['Order #'])} ↗</span>
           <span class="m-meta">${esc(row['Date'])}<br>${esc(row['Ship To'])}</span>
         </div>
         <div class="m-card-product">
@@ -1032,8 +1032,10 @@
     const v = row[key] ?? '';
     switch (key) {
       case 'Order #': {
-        const link = row['View Order'] || '#';
-        return `<td><a href="${esc(link)}" target="_blank" rel="noopener" class="order-num" style="text-decoration:none">${esc(v)} ↗</a></td>`;
+        const link = row['View Order'] || '';
+        return link
+          ? `<td><span class="order-num" style="cursor:pointer" onclick="goToOrder('${esc(link)}')">${esc(v)} ↗</span></td>`
+          : `<td><span class="order-num">${esc(v)}</span></td>`;
       }
       case 'Item':
         return `<td><span class="text-sub" style="white-space:nowrap">${esc(String(v))}</span></td>`;
@@ -1175,6 +1177,22 @@
     if (row['Greeting Card'] !== 'None') parts.push(`${qty}× ${esc(row['Greeting Card'])} card`);
     if (row['Ribbon & Bow'] === 'Yes')   parts.push(`${qty}× ribbon`);
     return `<div class="qty-warn"><span class="qty-warn-icon">⚠️</span>Same add-ons for all ${qty} boxes: ${parts.join(', ')}</div>`;
+  }
+
+  /* Navigate to a Shopify admin order page.
+     When embedded in the Shopify admin iframe, navigate the parent window.
+     When accessed directly (e.g. via Vercel URL), open a new tab. */
+  function goToOrder(url) {
+    if (!url) return;
+    try {
+      if (window.self !== window.top) {
+        window.top.location.href = url;
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (e) {
+      window.open(url, '_blank');
+    }
   }
 
   function fmtDate(iso) {
