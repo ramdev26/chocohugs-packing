@@ -9,6 +9,7 @@ const app = express();
 const SHOPIFY_STORE      = process.env.SHOPIFY_STORE;
 const SHOPIFY_API_KEY    = process.env.SHOPIFY_API_KEY;
 const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET;
+const STORE_HANDLE       = (SHOPIFY_STORE || '').replace('.myshopify.com', '');
 
 // HOST must be set explicitly in Vercel env vars — do NOT rely on VERCEL_URL
 // as it changes per deployment and won't match the whitelisted redirect URI.
@@ -71,110 +72,89 @@ function packingSummary(row) {
   return parts.join(' | ');
 }
 
-// Returns flat array of data rows (no separators) — used for the web preview.
-function ordersToRows(orders) {
-  const rows = [];
+// Shared helper — builds all row data for a single order's line items.
+function buildOrderRows(order) {
   const knownKeys = new Set(['greeting card', 'ribbon & bow', 'ribbon', 'personal message', 'message', 'note']);
+  const orderNote = (order.note || '').trim();
+  const orderDate = new Date(order.created_at).toLocaleDateString('en-GB', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+  });
 
-  for (const order of orders) {
-    const orderNote = (order.note || '').trim();
-    const orderDate = new Date(order.created_at).toLocaleDateString('en-GB', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-    });
-    const customer = order.shipping_address
-      ? `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim()
-      : (order.email || '');
-    const total = order.line_items.length;
+  const addr     = order.shipping_address || {};
+  const customer = addr.name ||
+    `${addr.first_name || ''} ${addr.last_name || ''}`.trim() ||
+    order.email || '';
+  const phone    = addr.phone || order.phone || '';
+  const email    = order.email || '';
 
-    for (let i = 0; i < order.line_items.length; i++) {
-      const item  = order.line_items[i];
-      const props = item.properties || [];
+  // Full address as single string for display
+  const addrDisplay = [
+    addr.address1,
+    addr.address2,
+    addr.city,
+    addr.province,
+    addr.zip,
+    addr.country,
+  ].filter(Boolean).join(', ');
 
-      const greetingCard = cleanCard(getProp(props, 'Greeting Card', 'greeting card'));
-      const ribbon       = cleanRibbon(getProp(props, 'Ribbon & Bow', 'ribbon & bow', 'ribbon'));
-      const message      = getProp(props, 'Personal Message', 'personal message', 'message', 'note') || orderNote;
+  const orderLink = `https://admin.shopify.com/store/${STORE_HANDLE}/orders/${order.id}`;
+  const total     = order.line_items.length;
 
-      const otherProps = props
-        .filter(p => !knownKeys.has(p.name.toLowerCase()) && !p.name.startsWith('_'))
-        .filter(p => p.value && !['none', 'no', ''].includes(p.value.toLowerCase()))
-        .map(p => `${p.name}: ${p.value}`)
-        .join(' | ');
+  return order.line_items.map((item, i) => {
+    const props = item.properties || [];
 
-      const row = {
-        'Order #':        `#${order.order_number}`,
-        'Date':           orderDate,
-        'Customer':       customer,
-        'Item':           total > 1 ? `${i + 1} of ${total}` : '1',
-        'Product':        item.title,
-        'Variant':        item.variant_title && item.variant_title !== 'Default Title' ? item.variant_title : '',
-        'Qty':            item.quantity,
-        'Greeting Card':  greetingCard,
-        'Ribbon & Bow':   ribbon,
-        'Message':        message,
-        'Other Add-ons':  otherProps,
-        'SKU':            item.sku || '',
-        'Status':         order.fulfillment_status || 'unfulfilled',
-      };
-      row['Packing Summary'] = packingSummary(row);
-      rows.push(row);
-    }
-  }
-  return rows;
+    const greetingCard = cleanCard(getProp(props, 'Greeting Card', 'greeting card'));
+    const ribbon       = cleanRibbon(getProp(props, 'Ribbon & Bow', 'ribbon & bow', 'ribbon'));
+    const message      = getProp(props, 'Personal Message', 'personal message', 'message', 'note') || orderNote;
+
+    const otherProps = props
+      .filter(p => !knownKeys.has(p.name.toLowerCase()) && !p.name.startsWith('_'))
+      .filter(p => p.value && !['none', 'no', ''].includes(p.value.toLowerCase()))
+      .map(p => `${p.name}: ${p.value}`)
+      .join(' | ');
+
+    const row = {
+      'Order #':          `#${order.order_number}`,
+      'Order Link':       orderLink,
+      'Date':             orderDate,
+      'Customer':         customer,
+      'Email':            email,
+      'Phone':            phone,
+      'Address':          addrDisplay,
+      'Address 1':        addr.address1 || '',
+      'Address 2':        addr.address2 || '',
+      'City':             addr.city     || '',
+      'County':           addr.province || '',
+      'Postcode':         addr.zip      || '',
+      'Country':          addr.country  || '',
+      'Item':             total > 1 ? `${i + 1} of ${total}` : '1',
+      'Product':          item.title,
+      'Variant':          item.variant_title && item.variant_title !== 'Default Title' ? item.variant_title : '',
+      'SKU':              item.sku || '',
+      'Qty':              item.quantity,
+      'Greeting Card':    greetingCard,
+      'Ribbon & Bow':     ribbon,
+      'Message':          message,
+      'Other Add-ons':    otherProps,
+      'Status':           order.fulfillment_status || 'unfulfilled',
+    };
+    row['Packing Summary'] = packingSummary(row);
+    return row;
+  });
 }
 
-// Returns rows with a null blank-line separator between each order — used for CSV export only.
+// Flat array for the web preview (no null separators).
+function ordersToRows(orders) {
+  return orders.flatMap(order => buildOrderRows(order));
+}
+
+// Rows with a blank-line null separator between orders — for CSV export.
 function ordersToCSVRows(orders) {
   const csvRows = [];
-  const knownKeys = new Set(['greeting card', 'ribbon & bow', 'ribbon', 'personal message', 'message', 'note']);
-
-  for (let oi = 0; oi < orders.length; oi++) {
-    const order     = orders[oi];
-    const orderNote = (order.note || '').trim();
-    const orderDate = new Date(order.created_at).toLocaleDateString('en-GB', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-    });
-    const customer = order.shipping_address
-      ? `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim()
-      : (order.email || '');
-    const total = order.line_items.length;
-
-    for (let i = 0; i < order.line_items.length; i++) {
-      const item  = order.line_items[i];
-      const props = item.properties || [];
-
-      const greetingCard = cleanCard(getProp(props, 'Greeting Card', 'greeting card'));
-      const ribbon       = cleanRibbon(getProp(props, 'Ribbon & Bow', 'ribbon & bow', 'ribbon'));
-      const message      = getProp(props, 'Personal Message', 'personal message', 'message', 'note') || orderNote;
-
-      const otherProps = props
-        .filter(p => !knownKeys.has(p.name.toLowerCase()) && !p.name.startsWith('_'))
-        .filter(p => p.value && !['none', 'no', ''].includes(p.value.toLowerCase()))
-        .map(p => `${p.name}: ${p.value}`)
-        .join(' | ');
-
-      const row = {
-        'Order #':        `#${order.order_number}`,
-        'Date':           orderDate,
-        'Customer':       customer,
-        'Item':           total > 1 ? `${i + 1} of ${total}` : '1',
-        'Product':        item.title,
-        'Variant':        item.variant_title && item.variant_title !== 'Default Title' ? item.variant_title : '',
-        'Qty':            item.quantity,
-        'Greeting Card':  greetingCard,
-        'Ribbon & Bow':   ribbon,
-        'Message':        message,
-        'Other Add-ons':  otherProps,
-        'SKU':            item.sku || '',
-        'Status':         order.fulfillment_status || 'unfulfilled',
-      };
-      row['Packing Summary'] = packingSummary(row);
-      csvRows.push(row);
-    }
-
-    // Blank separator row between orders (not after the last one)
+  orders.forEach((order, oi) => {
+    csvRows.push(...buildOrderRows(order));
     if (oi < orders.length - 1) csvRows.push(null);
-  }
-
+  });
   return csvRows;
 }
 

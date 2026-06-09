@@ -532,7 +532,7 @@
     const cols = [
       { key: 'Order #',       th: 'Order #'          },
       { key: 'Date',          th: 'Date'             },
-      { key: 'Customer',      th: 'Customer'         },
+      { key: 'Customer',      th: 'Ship To'          },
       { key: 'Item',          th: 'Item'             },
       { key: 'Product',       th: 'Product'          },
       { key: 'Qty',           th: 'Qty'              },
@@ -561,9 +561,15 @@
       const status  = row['Status'] || '';
       const statusCls = { fulfilled: 'b-fulfilled', unfulfilled: 'b-unfulfilled', partial: 'b-partial' }[status] || 'b-no';
 
+      const orderLink  = row['Order Link'] || '#';
       const variantLine = row['Variant']
         ? `<div class="m-psub">${esc(row['Variant'])}${row['SKU'] ? ' · SKU: ' + esc(row['SKU']) : ''}</div>`
         : (row['SKU'] ? `<div class="m-psub">SKU: ${esc(row['SKU'])}</div>` : '');
+      const shippingLines = [
+        row['Address']  ? `<div>${esc(row['Address'])}</div>` : '',
+        row['Phone']    ? `<div>📞 ${esc(row['Phone'])}</div>` : '',
+        row['Email']    ? `<div>✉ ${esc(row['Email'])}</div>` : '',
+      ].join('');
 
       const msgRow = message
         ? `<div class="m-addon m-full"><div class="m-addon-lbl">Message / Note</div><div class="m-msg">"${esc(message)}"</div></div>`
@@ -572,13 +578,14 @@
       return `
       <div class="m-card">
         <div class="m-card-head">
-          <span class="m-order">${esc(row['Order #'])}</span>
+          <a href="${esc(orderLink)}" target="_blank" rel="noopener" class="m-order" style="text-decoration:none;color:#fff">${esc(row['Order #'])} ↗</a>
           <span class="m-meta">${esc(row['Date'])}<br>${esc(row['Customer'])}</span>
         </div>
         <div class="m-card-product">
           <div class="m-pname">${esc(row['Product'])}</div>
           ${variantLine}
         </div>
+        ${shippingLines ? `<div class="m-addon m-full" style="border-bottom:1px solid var(--border);font-size:12px;color:var(--sub);line-height:1.6;border-right:none">${shippingLines}</div>` : ''}
         <div class="m-card-addons">
           <div class="m-addon ${multiQtyWarn(row) ? 'm-full' : ''}">
             <div class="m-addon-lbl">Qty</div>
@@ -617,10 +624,19 @@
   function renderCell(key, row) {
     const v = row[key] ?? '';
     switch (key) {
-      case 'Order #':
-        return `<td><span class="order-num">${esc(v)}</span></td>`;
+      case 'Order #': {
+        const link = row['Order Link'] || '#';
+        return `<td><a href="${esc(link)}" target="_blank" rel="noopener" class="order-num" style="text-decoration:none">${esc(v)} ↗</a></td>`;
+      }
       case 'Item':
         return `<td><span class="text-sub" style="white-space:nowrap">${esc(String(v))}</span></td>`;
+      case 'Customer': {
+        const addr  = row['Address'] ? `<div class="text-sub" style="max-width:180px">${esc(row['Address'])}</div>` : '';
+        const phone = row['Phone']   ? `<div class="text-sub">📞 ${esc(row['Phone'])}</div>` : '';
+        const email = row['Email']   ? `<div class="text-sub">✉ ${esc(row['Email'])}</div>` : '';
+        return `<td><div class="product-name">${esc(v)}</div>${addr}${phone}${email}</td>`;
+      }
+
       case 'Product': {
         const variant = row['Variant'] ? `<div class="text-sub">${esc(row['Variant'])}</div>` : '';
         const sku     = row['SKU']     ? `<div class="text-sub">SKU: ${esc(row['SKU'])}</div>` : '';
