@@ -178,6 +178,7 @@ async function fetchAllOrders({ startDate, endDate, fulfillmentStatus }) {
         'id', 'order_number', 'created_at', 'note',
         'email', 'financial_status', 'fulfillment_status',
         'shipping_address', 'line_items',
+        'total_price', 'subtotal_price', 'currency',
       ].join(','));
     }
 
@@ -326,7 +327,31 @@ function requireToken(req, res, next) {
 app.get('/api/orders', requireToken, async (req, res) => {
   try {
     const orders = await fetchAllOrders(req.query);
-    const rows   = ordersToRows(orders);  // flat, no nulls — for web preview
+    const rows   = ordersToRows(orders);
+
+    // ── Revenue analytics ──────────────────────────────────────────────
+    const currency     = orders[0]?.currency || 'GBP';
+    let   totalRevenue = 0;
+    const byDayMap     = {};
+
+    orders.forEach(order => {
+      const price = parseFloat(order.total_price || '0');
+      totalRevenue += price;
+      const d = new Date(order.created_at);
+      const key = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      if (!byDayMap[key]) byDayMap[key] = { revenue: 0, orders: 0, date: d };
+      byDayMap[key].revenue += price;
+      byDayMap[key].orders  += 1;
+    });
+
+    const byDay = Object.values(byDayMap)
+      .sort((a, b) => a.date - b.date)
+      .map(({ date, revenue, orders: cnt }) => ({
+        date:    date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+        revenue: Math.round(revenue * 100) / 100,
+        orders:  cnt,
+      }));
+
     res.json({
       rows,
       stats: {
@@ -334,6 +359,12 @@ app.get('/api/orders', requireToken, async (req, res) => {
         rowCount:   rows.length,
         withCard:   rows.filter(r => r['Greeting Card'] !== 'None').length,
         withRibbon: rows.filter(r => r['Ribbon & Bow']  === 'Yes').length,
+      },
+      revenue: {
+        total:         Math.round(totalRevenue * 100) / 100,
+        avgOrderValue: orders.length ? Math.round((totalRevenue / orders.length) * 100) / 100 : 0,
+        currency,
+        byDay,
       },
     });
   } catch (e) {
