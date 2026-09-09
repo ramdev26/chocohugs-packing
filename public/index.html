@@ -500,6 +500,28 @@
       .kpi-val { font-size: 22px; }
     }
 
+    /* ── Compact packing sheet ── */
+    /* One row per gift box: what to pack, which card, ribbon or not. Nothing
+       else — the shipping label carries the delivery details. */
+    .sheet-view { display: none; }
+    body.mode-sheet .full-view  { display: none; }
+    body.mode-sheet .sheet-view { display: block; }
+
+    table.sheet { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.sheet th {
+      text-align: left; padding: 5px 7px; border-bottom: 2px solid #202223;
+      font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+      color: #202223; background: none; white-space: nowrap;
+    }
+    table.sheet td { padding: 4px 7px; border-bottom: 1px solid #ececec; vertical-align: top; }
+    table.sheet tr.order-start td { border-top: 1px solid #b5b9bc; }
+    table.sheet .s-ord  { font-weight: 700; white-space: nowrap; }
+    table.sheet .s-qty  { text-align: center; width: 34px; }
+    table.sheet .s-card { white-space: nowrap; }
+    table.sheet .s-yes  { font-weight: 800; color: #0f7a4d; white-space: nowrap; }
+    table.sheet .s-no   { color: #9a9fa4; }
+    table.sheet .s-warn { background: #fff4e5; color: #a8571a; font-weight: 700; font-size: 11px; }
+
     /* ── Print ── */
     .print-header { display: none; }
     @media print {
@@ -507,12 +529,19 @@
       body { background: white; font-size: 11px; }
       .card { border: none; margin-bottom: 0; }
       .table-bar span { font-size: 11px; }
-      .print-header { display: block; padding: 0 0 10px; font-size: 14px; font-weight: 700; }
+      .print-header { display: block; padding: 0 0 8px; font-size: 13px; font-weight: 700; }
       .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      thead th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       tbody tr { page-break-inside: avoid; }
       .m-cards { display: none !important; }
-      .tbl-wrap table { display: table !important; }
+
+      /* Always print the compact sheet, whichever view is on screen. */
+      .full-view  { display: none !important; }
+      .sheet-view { display: block !important; }
+      @page { size: A4 portrait; margin: 10mm; }
+      table.sheet { font-size: 10.5px; }
+      table.sheet th, table.sheet td { padding: 2.5px 4px; }
+      table.sheet thead { display: table-header-group; }
+      table.sheet .s-yes { color: #000; }
     }
   </style>
 </head>
@@ -557,6 +586,7 @@
 
         <div class="field-actions no-print">
           <a class="btn btn-plain" id="exportBtn" href="#" onclick="return false;" disabled>⬇ Export CSV</a>
+          <button class="btn btn-plain" id="viewBtn" onclick="toggleView()" disabled>📊 Full detail</button>
           <button class="btn btn-plain" id="printBtn" onclick="window.print()" disabled>🖨 Print</button>
           <button class="btn btn-plain" id="bundleBtn" onclick="openBundle()" disabled>📊 Bundle Analytics</button>
         </div>
@@ -682,6 +712,10 @@
   let lastParams  = null;
   let lastRevenue = null;
   let allRows     = [];   // full unfiltered set — used by applyFilters()
+
+  // Packers work from the compact sheet, so open on it. The full detail view is
+  // one click away, and printing always produces the sheet either way.
+  document.body.classList.add('mode-sheet');
   let salesChart  = null;
   let convChart   = null;
 
@@ -772,17 +806,20 @@
     const eb = document.getElementById('exportBtn');
     const pb = document.getElementById('printBtn');
     const bb = document.getElementById('bundleBtn');
+    const vb = document.getElementById('viewBtn');
     if (enabled) {
       eb.href = exportUrl;
       eb.removeAttribute('disabled');
       eb.onclick = null;
       pb.removeAttribute('disabled');
       bb.removeAttribute('disabled');
+      vb.removeAttribute('disabled');
     } else {
       eb.setAttribute('disabled', true);
       eb.onclick = () => false;
       pb.setAttribute('disabled', true);
       bb.setAttribute('disabled', true);
+      vb.setAttribute('disabled', true);
     }
   }
 
@@ -920,10 +957,60 @@
     // Re-render table and analytics
     document.getElementById('tblWrap').innerHTML =
       filtered.length
-        ? buildTable(filtered) + buildCards(filtered)
+        ? `<div class="full-view">${buildTable(filtered)}${buildCards(filtered)}</div>` +
+          `<div class="sheet-view">${buildSheet(filtered)}</div>`
         : '<div class="state"><div class="ico">🔍</div><p>No items match the selected add-on filters.</p></div>';
 
     buildAnalytics(filtered);
+  }
+
+  /* ── Compact packing sheet ──────────────────────────────────────────────────
+     One row per gift box. Ribbon add-on lines never reach here — the server
+     folds them into the box they belong to — so the operator sees only what to
+     pack, which card goes in, and whether it needs a ribbon. */
+  function buildSheet(rows) {
+    let body = '', lastOrder = null, boxes = 0, ribbons = 0, checks = 0;
+
+    for (const r of rows) {
+      const isFirst = r['Order #'] !== lastOrder;
+      lastOrder = r['Order #'];
+      const hasRibbon = r['Ribbon & Bow'] === 'Yes';
+      boxes += Number(r['Qty']) || 0;
+      if (hasRibbon) ribbons++;
+
+      body += `<tr class="${isFirst ? 'order-start' : ''}">
+        <td class="s-ord">${isFirst ? esc(r['Order #']) : ''}</td>
+        <td class="s-qty">${esc(r['Qty'])}</td>
+        <td>${esc(r['_short'] || r['Product'])}</td>
+        <td class="s-card">${esc(r['Greeting Card'])}</td>
+        <td class="${hasRibbon ? 's-yes' : 's-no'}">${hasRibbon ? 'YES' : 'No'}</td>
+      </tr>`;
+
+      if (r['_ribbonCheck']) {
+        checks++;
+        body += `<tr><td></td><td colspan="4" class="s-warn">⚠ ${esc(r['_ribbonCheck'])}</td></tr>`;
+      }
+    }
+
+    const orders = new Set(rows.map(r => r['Order #'])).size;
+    const bits = [
+      `${orders} order${orders === 1 ? '' : 's'}`,
+      `${boxes} box${boxes === 1 ? '' : 'es'}`,
+      `${ribbons} ribbon${ribbons === 1 ? '' : 's'}`,
+    ];
+    if (checks) bits.push(`${checks} needing a ribbon check`);
+
+    return `<div class="print-header">Packing Sheet — ${bits.join(' · ')} — ${new Date().toLocaleDateString('en-GB')}</div>
+      <table class="sheet">
+        <thead><tr><th>Order</th><th>Qty</th><th>Product</th><th>Card</th><th>Ribbon</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>`;
+  }
+
+  /* ── View toggle (compact sheet is the default for packing) ── */
+  function toggleView() {
+    const sheet = document.body.classList.toggle('mode-sheet');
+    document.getElementById('viewBtn').textContent = sheet ? '📊 Full detail' : '📋 Packing sheet';
   }
 
   /* ── Reset add-on filters ── */

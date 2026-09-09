@@ -58,6 +58,122 @@ function cleanCard(val) {
   return val.trim();
 }
 
+const RIBBON_SKU = 'RIBBON-BOW-ADDON';
+
+function isBlankVal(v) {
+  const s = String(v == null ? '' : v).toLowerCase().trim();
+  return !s || s === 'none' || s === 'no' || s === 'false' || s === '0' || s === 'n/a';
+}
+
+function titleCase(s) {
+  return String(s || '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .map(w => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(' ');
+}
+
+function isRibbonLine(item) {
+  if ((item.sku || '').toUpperCase().trim() === RIBBON_SKU) return true;
+  return /ribbon\s*(&|and)\s*bow\s*add-?on/i.test(item.title || '');
+}
+
+// The occasion is stored under a different property name depending on when the
+// order was placed: "Greeting Card"/"Corporate Card" on older ones, "Occasion"
+// (slug or title form) on newer ones, and nothing at all on some — where only
+// the variant or product title reveals it. Checking just "Greeting Card" is why
+// most orders reported "None".
+function resolveCard(item) {
+  const props = item.properties || [];
+
+  const direct = getProp(props, 'Greeting Card', 'Occasion', 'Card', 'Card Type');
+  if (!isBlankVal(direct)) return titleCase(direct);
+
+  const corp = getProp(props, 'Corporate Card');
+  if (!isBlankVal(corp)) return titleCase(corp);
+
+  const swatch = props.find(p => (p.name || '').toLowerCase().startsWith('image-swatches'));
+  if (swatch && !isBlankVal(swatch.value)) return titleCase(swatch.value);
+
+  const vt = item.variant_title || '';
+  if (vt.includes('/')) {
+    const part = vt.split('/').pop().trim();
+    if (!isBlankVal(part)) return titleCase(part);
+  }
+
+  const m = (item.title || '').match(/"([^"]+)"/);
+  if (m && !isBlankVal(m[1])) return titleCase(m[1]);
+
+  return 'None';
+}
+
+// Work out which specific gift box each ribbon belongs to, in priority order:
+//   1. `_ribbon_for_variant` on the add-on names the exact variant. Orders from
+//      5 Sep 2026 onward carry this, so attribution is exact.
+//   2. A "Ribbon & Bow" property on the box itself — older orders, which have
+//      no add-on line at all (e.g. #1014).
+//   3. A single-box order with an unlinked add-on: unambiguous by elimination.
+// Reading only the property (the previous behaviour) reported "No" on every row
+// of order #1018, which had a ribbon as an add-on line and no property at all.
+// Anything still unmatched is genuinely NOT recorded in Shopify — #1018 has two
+// boxes and one unlinked ribbon — so it is flagged rather than guessed onto a
+// box, which would risk ribboning the wrong gift.
+function assignRibbons(order) {
+  const lines  = order.line_items || [];
+  const boxes  = lines.filter(l => !isRibbonLine(l));
+  const addons = lines.filter(isRibbonLine);
+
+  const assign = new Map();
+  boxes.forEach(b => assign.set(b, false));
+
+  let unassigned = 0;
+  for (const a of addons) {
+    const lv = getProp(a.properties, '_ribbon_for_variant');
+    const target = lv && boxes.find(b => String(b.variant_id) === String(lv).trim());
+    if (target) { assign.set(target, true); continue; }
+    unassigned += a.quantity || 1;
+  }
+
+  for (const b of boxes) {
+    if (!isBlankVal(getProp(b.properties, 'Ribbon & Bow', 'ribbon & bow', 'ribbon', 'bow'))) {
+      assign.set(b, true);
+    }
+  }
+
+  if (unassigned > 0 && boxes.length === 1) { assign.set(boxes[0], true); unassigned = 0; }
+
+  const addonQty = addons.reduce((s, a) => s + (a.quantity || 1), 0);
+  const count = addonQty > 0 ? addonQty : boxes.filter(b => assign.get(b)).length;
+  return { boxes, assign, unassigned, count };
+}
+
+// Long catalogue titles are unreadable on a packing sheet: strip the boilerplate
+// back to range and occasion, e.g. "Galaxy – Thank You".
+const BOILERPLATE = /\b(chocohugs|chocolate|gift|box|filled|with|selections?|favourites?|block\s*&\s*bar|mixed)\b/gi;
+
+function tidyName(s) {
+  return String(s || '')
+    .replace(/"[^"]*"/g, ' ')
+    .replace(BOILERPLATE, ' ')
+    .replace(/[()]/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[\s\-–]+|[\s\-–]+$/g, '')
+    .trim();
+}
+
+function shortProduct(item) {
+  const vt = item.variant_title || '';
+  if (vt.includes('/')) {
+    const parts = vt.split('/');
+    const range = tidyName(parts[0]) || parts[0].trim();
+    const occ   = parts.slice(1).join('/').trim();
+    return occ ? `${range} – ${occ}` : range;
+  }
+  return tidyName(item.title) || item.title;
+}
+
 function packingSummary(row) {
   const qty     = Number(row['Qty']);
   const product = row['Product'] + (row['Variant'] ? ` (${row['Variant']})` : '');
@@ -68,13 +184,15 @@ function packingSummary(row) {
 
   const hasAddon = row['Greeting Card'] !== 'None' || row['Ribbon & Bow'] === 'Yes';
   if (qty > 1 && hasAddon) parts.push(`⚠ SAME ADD-ONS FOR ALL ${qty} BOXES`);
+  if (row['_ribbonCheck']) parts.push(`⚠ ${row['_ribbonCheck']}`);
 
   return parts.join(' | ');
 }
 
 // Shared helper — builds all row data for a single order's line items.
 function buildOrderRows(order) {
-  const knownKeys = new Set(['greeting card', 'ribbon & bow', 'ribbon', 'personal message', 'message', 'note']);
+  const knownKeys = new Set(['greeting card', 'corporate card', 'occasion', 'card', 'card type',
+    'ribbon & bow', 'ribbon', 'bow', 'personal message', 'message', 'note', 'linked to']);
   const orderNote = (order.note || '').trim();
   const orderDate = new Date(order.created_at).toLocaleDateString('en-GB', {
     day: '2-digit', month: '2-digit', year: 'numeric',
@@ -98,13 +216,21 @@ function buildOrderRows(order) {
   ].filter(Boolean).join(', ');
 
   const orderLink = `https://admin.shopify.com/store/${STORE_HANDLE}/orders/${order.id}`;
-  const total     = order.line_items.length;
 
-  return order.line_items.map((item, i) => {
+  // Ribbon add-on lines are not something to pack on their own — they are
+  // folded into the gift box they belong to, so only boxes become rows.
+  const ribbons   = assignRibbons(order);
+  const boxes     = ribbons.boxes;
+  const total     = boxes.length;
+  const checkNote = ribbons.unassigned > 0
+    ? `${ribbons.unassigned} ribbon${ribbons.unassigned > 1 ? 's' : ''} on this order — which box was not recorded, please check the order`
+    : '';
+
+  return boxes.map((item, i) => {
     const props = item.properties || [];
 
-    const greetingCard = cleanCard(getProp(props, 'Greeting Card', 'greeting card'));
-    const ribbon       = cleanRibbon(getProp(props, 'Ribbon & Bow', 'ribbon & bow', 'ribbon'));
+    const greetingCard = resolveCard(item);
+    const ribbon       = ribbons.assign.get(item) ? 'Yes' : 'No';
     const message      = getProp(props, 'Personal Message', 'personal message', 'message', 'note') || orderNote;
 
     const otherProps = props
@@ -146,6 +272,11 @@ function buildOrderRows(order) {
 
       // ── Reference ────────────────────────────────────
       'View Order':      orderLink,
+
+      // ── Internal (stripped from CSV by toCSV) ────────
+      '_short':          shortProduct(item),
+      '_ribbonCheck':    i === 0 ? checkNote : '',
+      '_firstOfOrder':   i === 0,
 
     };
     row['Packing Summary'] = packingSummary(row);
