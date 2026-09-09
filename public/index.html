@@ -223,6 +223,7 @@
     .b-card        { background: var(--badge-card);   color: var(--badge-card-t); }
     .b-fulfilled   { background: var(--badge-yes);    color: var(--badge-yes-t); }
     .b-unfulfilled { background: var(--badge-warn);   color: var(--badge-warn-t); }
+    .b-check       { background: #fff4e5;             color: #a8571a; }
     .b-partial     { background: var(--badge-card);   color: var(--badge-card-t); }
 
     /* ── Multi-qty add-on warning ── */
@@ -986,7 +987,9 @@
         <td class="${hasRibbon ? 's-yes' : 's-no'}">${hasRibbon ? 'YES' : 'No'}</td>
       </tr>`;
 
-      if (r['_ribbonCheck']) {
+      // The note rides on every row of the order so no view can miss it, but
+      // the sheet prints it once, under the first box.
+      if (r['_ribbonCheck'] && r['_firstOfOrder']) {
         checks++;
         body += `<tr><td></td><td colspan="4" class="s-warn">⚠ ${esc(r['_ribbonCheck'])}</td></tr>`;
       }
@@ -1100,7 +1103,10 @@
             <div class="m-addon-lbl">Ribbon &amp; Bow</div>
             ${ribbon === 'Yes'
               ? '<span class="badge b-yes">✓ Yes</span>'
-              : '<span class="badge b-no">No</span>'}
+              : row['_ribbonCheck']
+                ? `<span class="badge b-check">⚠ CHECK</span>
+                   <div class="m-psub">${esc(row['_ribbonCheck'])}</div>`
+                : '<span class="badge b-no">No</span>'}
           </div>
           ${msgRow}
           <div class="m-addon m-full" style="border-bottom:none;">
@@ -1148,10 +1154,16 @@
         return v === 'None'
           ? `<td><span class="badge b-no">None</span></td>`
           : `<td><span class="badge b-card">${esc(v)}</span></td>`;
-      case 'Ribbon & Bow':
-        return v === 'Yes'
-          ? `<td><span class="badge b-yes">✓ Yes</span></td>`
-          : `<td><span class="badge b-no">No</span></td>`;
+      case 'Ribbon & Bow': {
+        if (v === 'Yes') return `<td><span class="badge b-yes">✓ Yes</span></td>`;
+        // A ribbon was paid for but the order never recorded which box it was
+        // for. Never show a bare "No" here — that reads as "nothing to add".
+        if (row['_ribbonCheck']) {
+          return `<td><span class="badge b-check" title="${esc(row['_ribbonCheck'])}">⚠ CHECK</span>
+            <div class="text-sub" style="max-width:150px">${esc(row['_ribbonCheck'])}</div></td>`;
+        }
+        return `<td><span class="badge b-no">No</span></td>`;
+      }
       case 'Message / Note':
         return v
           ? `<td><span class="msg">"${esc(v)}"</span></td>`

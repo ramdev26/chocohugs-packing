@@ -274,8 +274,13 @@ function buildOrderRows(order) {
       'View Order':      orderLink,
 
       // ── Internal (stripped from CSV by toCSV) ────────
+      // The check note goes on EVERY box of the order, not just the first: an
+      // operator looking at any one row must see that a ribbon is owed, or the
+      // order ships without it. The sheet prints the note once, using
+      // _firstOfOrder to avoid repeating it.
       '_short':          shortProduct(item),
-      '_ribbonCheck':    i === 0 ? checkNote : '',
+      '_ribbonCheck':    checkNote,
+      '_ribbonCount':    ribbons.count,
       '_firstOfOrder':   i === 0,
 
     };
